@@ -34,6 +34,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
+import com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler;
+import com.github.Anon8281.universalScheduler.UniversalScheduler;
 
 import java.io.File;
 
@@ -57,6 +59,7 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     private UltimateAntiBotCore core;
     private SatelliteServer satellite;
     private boolean isRunning;
+    private static TaskScheduler universalScheduler;
 
     @Override
     public void onEnable() {
@@ -66,6 +69,12 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         PerformanceHelper.init(ServerType.SPIGOT);
         ServerUtil.setInstance(this);
         this.scheduler = Bukkit.getScheduler();
+        try {
+            universalScheduler = UniversalScheduler.getScheduler(this);
+        } catch (Throwable t) {
+            universalScheduler = null;
+        }
+
         this.config = new Config(this, "config");
         this.messages = new Config(this, "messages");
         this.whitelist = new Config(this, "whitelist");
@@ -153,15 +162,22 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         long a = System.currentTimeMillis();
         logHelper.info("&cUnloading...");
         this.isRunning = false;
-        this.attackTrackerService.unload();
-        firewallService.shutDownFirewall();
-        userDataService.unload();
-        VPNService.unload();
-        antiBotManager.getBlackListService().unload();
-        antiBotManager.getWhitelistService().unload();
+        if(attackTrackerService != null) attackTrackerService.unload();
+        if(firewallService != null) firewallService.shutDownFirewall();
+        if(userDataService != null) userDataService.unload();
+        if(VPNService != null) VPNService.unload();
+        if(antiBotManager != null){
+            antiBotManager.getBlackListService().unload();
+            antiBotManager.getWhitelistService().unload();
+        }
         logHelper.info("&cThanks for choosing us!");
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to unload");
+    }
+
+    private long msToTicks(long ms){
+        long t = ms / 50L;
+        return t <= 0 ? 1 : t;
     }
 
     @Override
@@ -175,6 +191,10 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
 
     @Override
     public void runTask(Runnable task, boolean isAsync) {
+        if (universalScheduler != null) {
+            universalScheduler.runTask(task); // UniversalScheduler handles Folia-safe execution
+            return;
+        }
         if (isAsync) {
             scheduler.runTaskAsynchronously(this, task);
         } else {
@@ -184,58 +204,70 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
 
     @Override
     public void runTask(UABRunnable runnable) {
-        BukkitTask bukkitTask = null;
-
-        if (runnable.isAsync()) {
-            bukkitTask = scheduler.runTaskAsynchronously(this, runnable);
-        } else {
-            bukkitTask = scheduler.runTask(this, runnable);
+        if (universalScheduler != null) {
+            universalScheduler.runTask(runnable);
+            runnable.setTaskID(-1);
+            return;
         }
-
+        // Bukkit fallback
+        BukkitTask bukkitTask = runnable.isAsync() ?
+                scheduler.runTaskAsynchronously(this, runnable) :
+                scheduler.runTask(this, runnable);
         runnable.setTaskID(bukkitTask.getTaskId());
     }
 
     @Override
     public void scheduleDelayedTask(Runnable runnable, boolean async, long milliseconds) {
+        if (universalScheduler != null) {
+            universalScheduler.runTaskLater(runnable, msToTicks(milliseconds));
+            return;
+        }
         if (async) {
-            scheduler.runTaskLaterAsynchronously(this, runnable, Utils.convertToTicks(milliseconds));
+            scheduler.runTaskLaterAsynchronously(this, runnable, msToTicks(milliseconds));
         } else {
-            scheduler.runTaskLater(this, runnable, Utils.convertToTicks(milliseconds));
+            scheduler.runTaskLater(this, runnable, msToTicks(milliseconds));
         }
     }
 
     @Override
     public void scheduleDelayedTask(UABRunnable runnable) {
-        BukkitTask bukkitTask = null;
-
-        if (runnable.isAsync()) {
-            bukkitTask = scheduler.runTaskLaterAsynchronously(this, runnable, Utils.convertToTicks(runnable.getPeriod()));
-        } else {
-            bukkitTask = scheduler.runTaskLater(this, runnable, Utils.convertToTicks(runnable.getPeriod()));
+        long ticks = msToTicks(runnable.getPeriod());
+        if (universalScheduler != null) {
+            universalScheduler.runTaskLater(runnable, ticks);
+            runnable.setTaskID(-1);
+            return;
         }
-
+        BukkitTask bukkitTask = runnable.isAsync() ?
+                scheduler.runTaskLaterAsynchronously(this, runnable, ticks) :
+                scheduler.runTaskLater(this, runnable, ticks);
         runnable.setTaskID(bukkitTask.getTaskId());
     }
 
     @Override
     public void scheduleRepeatingTask(Runnable runnable, boolean async, long repeatMilliseconds) {
+        long periodTicks = msToTicks(repeatMilliseconds);
+        if (universalScheduler != null) {
+            universalScheduler.runTaskTimer(runnable, 0L, periodTicks);
+            return;
+        }
         if (async) {
-            scheduler.runTaskTimerAsynchronously(this, runnable, 0, Utils.convertToTicks(repeatMilliseconds));
+            scheduler.runTaskTimerAsynchronously(this, runnable, 0L, periodTicks);
         } else {
-            scheduler.runTaskTimer(this, runnable, 0, Utils.convertToTicks(repeatMilliseconds));
+            scheduler.runTaskTimer(this, runnable, 0L, periodTicks);
         }
     }
 
     @Override
     public void scheduleRepeatingTask(UABRunnable runnable) {
-        BukkitTask bukkitTask = null;
-
-        if (runnable.isAsync()) {
-            bukkitTask = scheduler.runTaskTimerAsynchronously(this, runnable, 0, Utils.convertToTicks(runnable.getPeriod()));
-        } else {
-            bukkitTask = scheduler.runTaskTimer(this, runnable, 0, Utils.convertToTicks(runnable.getPeriod()));
+        long periodTicks = msToTicks(runnable.getPeriod());
+        if (universalScheduler != null) {
+            universalScheduler.runTaskTimer(runnable, 0L, periodTicks);
+            runnable.setTaskID(-1);
+            return;
         }
-
+        BukkitTask bukkitTask = runnable.isAsync() ?
+                scheduler.runTaskTimerAsynchronously(this, runnable, 0L, periodTicks) :
+                scheduler.runTaskTimer(this, runnable, 0L, periodTicks);
         runnable.setTaskID(bukkitTask.getTaskId());
     }
 
@@ -373,6 +405,10 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     @Override
     public File getDFolder() {
         return getDataFolder();
+    }
+
+    public static TaskScheduler getScheduler() {
+        return universalScheduler;
     }
 
     public static UltimateAntiBotSpigot getInstance() {
