@@ -1,5 +1,8 @@
 package me.kr1s_d.ultimateantibot;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import me.kr1s_d.ultimateantibot.common.BarColor;
 import me.kr1s_d.ultimateantibot.common.BarStyle;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
@@ -13,9 +16,6 @@ import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.Title;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class Notificator implements INotificator {
     private static final List<ProxiedPlayer> actionbars = new ArrayList<>();
@@ -76,14 +76,16 @@ public class Notificator implements INotificator {
         titles.clear();
     }
 
-    public void sendActionbar(String str) {
-        actionbars.forEach(ac -> ac.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ServerUtil.colorize(str))));
+    public void sendActionbar(String coloredMessage) {
+        actionbars.forEach(ac -> ac.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(coloredMessage)));
     }
 
     public void sendTitle(String title, String subtitle) {
         Title t = ProxyServer.getInstance().createTitle();
-        t.title(new TextComponent(ServerUtil.colorize(UltimateAntiBotBungeeCord.getInstance().getAntiBotManager().replaceInfo(title))));
-        t.subTitle(new TextComponent(ServerUtil.colorize(UltimateAntiBotBungeeCord.getInstance().getAntiBotManager().replaceInfo(subtitle))));
+        String formattedTitle = ServerUtil.colorize(UltimateAntiBotBungeeCord.getInstance().getAntiBotManager().replaceInfo(title));
+        String formattedSubtitle = ServerUtil.colorize(UltimateAntiBotBungeeCord.getInstance().getAntiBotManager().replaceInfo(subtitle));
+        t.title(new TextComponent(formattedTitle));
+        t.subTitle(new TextComponent(formattedSubtitle));
         t.stay(20);
         t.fadeIn(0);
         t.fadeOut(0);
@@ -102,13 +104,16 @@ public class Notificator implements INotificator {
                 sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
             }
             if(plugin.getAntiBotManager().isPacketModeEnabled()) {
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                sendActionbar(msg);
                 return;
             }
             if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                sendActionbar(msg);
             }else{
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                sendActionbar(msg);
             }
         }, false, 125L);
     }

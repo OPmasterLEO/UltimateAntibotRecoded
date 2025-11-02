@@ -1,5 +1,10 @@
 package me.kr1s_d.ultimateantibot;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.bukkit.entity.Player;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.INotificator;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
@@ -8,10 +13,6 @@ import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
 import me.kr1s_d.ultimateantibot.utils.KBossBar;
 import me.kr1s_d.ultimateantibot.utils.Utils;
 import me.kr1s_d.ultimateantibot.utils.Version;
-import org.bukkit.entity.Player;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class Notificator implements INotificator {
     private static final List<Player> actionbars = new ArrayList<>();
@@ -72,14 +73,16 @@ public class Notificator implements INotificator {
         titles.clear();
     }
 
-    public void sendActionbar(String str){
-        actionbars.forEach(ac -> Utils.sendActionbar(ac, ServerUtil.colorize(str)));
+    public void sendActionbar(String coloredMessage){
+        actionbars.forEach(ac -> Utils.sendActionbar(ac, coloredMessage));
     }
 
     public void sendTitle(String title, String subtitle){
+        String formattedTitle = UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(title));
+        String formattedSubtitle = UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(subtitle));
         titles.forEach(t -> t.sendTitle(
-                UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(title)),
-                UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(subtitle)),
+                formattedTitle,
+                formattedSubtitle,
                 0,
                 30,
                 0
@@ -99,13 +102,16 @@ public class Notificator implements INotificator {
                 sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
             }
             if(plugin.getAntiBotManager().isPacketModeEnabled()){
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                sendActionbar(msg);
                 return;
             }
             if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                sendActionbar(msg);
             }else{
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                sendActionbar(msg);
             }
         }, false, 125L);
     }

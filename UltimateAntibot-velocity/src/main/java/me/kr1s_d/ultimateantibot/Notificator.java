@@ -1,6 +1,10 @@
 package me.kr1s_d.ultimateantibot;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.velocitypowered.api.proxy.Player;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.INotificator;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
@@ -9,9 +13,6 @@ import me.kr1s_d.ultimateantibot.utils.Utils;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.title.Title;
 import net.kyori.adventure.title.TitlePart;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class Notificator implements INotificator {
     private static final List<Player> actionbars = new ArrayList<>();
@@ -87,14 +88,19 @@ public class Notificator implements INotificator {
     }
 
 
-    public void sendActionbar(String str) {
+    public void sendActionbar(net.kyori.adventure.text.Component coloredMessage) {
         for (Player actionbar : actionbars) {
-            actionbar.sendActionBar(Utils.colora(str));
+            actionbar.sendActionBar(coloredMessage);
         }
+    }
+    public void sendActionbar(String str) {
+        sendActionbar(Utils.colora(str));
     }
 
     public void sendTitle(String title, String subtitle) {
-        Title t = Title.title(Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(title)), Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(subtitle)));
+    net.kyori.adventure.text.Component formattedTitle = Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(title));
+    net.kyori.adventure.text.Component formattedSubtitle = Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(subtitle));
+    Title t = Title.title(formattedTitle, formattedSubtitle);
 
         for (Player player : titles) {
             player.sendTitlePart(TitlePart.TITLE, t.title());
@@ -114,13 +120,16 @@ public class Notificator implements INotificator {
                 sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
             }
             if(plugin.getAntiBotManager().isPacketModeEnabled()) {
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
+                sendActionbar(msg);
                 return;
             }
             if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
+                sendActionbar(msg);
             }else{
-                sendActionbar(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
+                sendActionbar(msg);
             }
         }, false, 125L);
     }

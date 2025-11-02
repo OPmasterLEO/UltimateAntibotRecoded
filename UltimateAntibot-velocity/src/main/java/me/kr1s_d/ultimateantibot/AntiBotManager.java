@@ -5,8 +5,8 @@ import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.ModeType;
 import me.kr1s_d.ultimateantibot.common.cache.JoinCache;
-import me.kr1s_d.ultimateantibot.common.core.detectors.AttackDurationDetector;
 import me.kr1s_d.ultimateantibot.common.core.AttackWatcher;
+import me.kr1s_d.ultimateantibot.common.core.detectors.AttackDurationDetector;
 import me.kr1s_d.ultimateantibot.common.core.thread.DynamicCounterThread;
 import me.kr1s_d.ultimateantibot.common.helper.LogHelper;
 import me.kr1s_d.ultimateantibot.common.service.BlackListService;
@@ -339,21 +339,35 @@ public class AntiBotManager implements IAntiBotManager {
 
     @Override
     public String replaceInfo(String str) {
-        return str
-                .replace("%bots%", String.valueOf(joinPerSecond.getSlowCount()))
-                .replace("%pings%", String.valueOf(pingPerSecond.getSlowCount()))
-                .replace("%queue%", String.valueOf(queueService.size()))
-                .replace("%whitelist%", String.valueOf(whitelistService.size()))
-                .replace("%blacklist%", String.valueOf(blackListService.size()))
-                .replace("%type%", String.valueOf(modeType.toString()))
-                .replace("%packets%", String.valueOf(packetPerSecond.getSlowCount()))
-                .replace("%totalbots%", String.valueOf(Formatter.format(joinPerSecond.getTotal())))
-                .replace("%totalpings%", String.valueOf(Formatter.format(pingPerSecond.getTotal())))
-                .replace("%totalpackets%", String.valueOf(Formatter.format(packetPerSecond.getTotal())))
-                .replace("%latency%", iAntiBotPlugin.getLatencyThread().getLatency())
-                .replace("%prefix%", iAntiBotPlugin.getAnimationThread().getEmote() + " " + MessageManager.prefix)
-                .replace("%underverification%", String.valueOf(VPNService.getUnderVerificationSize()))
-                .replace("%attack-types%", attackWatcher.getFiredAttacks().toString())
-                ;
+    long bots = joinPerSecond.getSlowCount();
+    long pings = pingPerSecond.getSlowCount();
+    long packets = packetPerSecond.getSlowCount();
+    int queue = queueService.size();
+    int whitelist = whitelistService.size();
+    int blacklist = blackListService.size();
+    String type = modeType.toString();
+    String totalBots = Formatter.format(joinPerSecond.getTotal());
+    String totalPings = Formatter.format(pingPerSecond.getTotal());
+    String totalPackets = Formatter.format(packetPerSecond.getTotal());
+    String latency = iAntiBotPlugin.getLatencyThread().getLatency();
+    String prefix = iAntiBotPlugin.getAnimationThread().getEmote() + " " + MessageManager.prefix;
+    String underVerification = String.valueOf(VPNService.getUnderVerificationSize());
+    String attackTypes = attackWatcher.getFiredAttacks().toString();
+
+    return str
+        .replace("%bots%", String.valueOf(bots))
+        .replace("%pings%", String.valueOf(pings))
+        .replace("%queue%", String.valueOf(queue))
+        .replace("%whitelist%", String.valueOf(whitelist))
+        .replace("%blacklist%", String.valueOf(blacklist))
+        .replace("%type%", type)
+        .replace("%packets%", String.valueOf(packets))
+        .replace("%totalbots%", totalBots)
+        .replace("%totalpings%", totalPings)
+        .replace("%totalpackets%", totalPackets)
+        .replace("%latency%", latency)
+        .replace("%prefix%", prefix)
+        .replace("%underverification%", underVerification)
+        .replace("%attack-types%", attackTypes);
     }
 }

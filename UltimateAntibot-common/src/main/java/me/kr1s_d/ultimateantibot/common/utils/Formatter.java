@@ -5,35 +5,37 @@ import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
 public class Formatter {
+    private static final String[] SUFFIXES = {"", "k", "M", "B", "T", "Q", "KQ"};
+    private static final ThreadLocal<DecimalFormat> DECIMAL_FORMAT = ThreadLocal.withInitial(() -> {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.ITALIAN);
+        DecimalFormat df = new DecimalFormat("###.##", symbols);
+        df.setGroupingUsed(false);
+        return df;
+    });
+
     public static String format(float value) {
-        String[] arr = {"", "k", "M", "B", "T", "Q", "KQ"};
-
-        int i= 0;
+        int idx = 0;
         while ((value / 1000) >= 1) {
-            value /= 1000;
-            i++;
+            value /= 1000f;
+            idx++;
         }
-
-        if(i >= arr.length) {
-            i = 5;
+        if (idx >= SUFFIXES.length) {
+            idx = 5;
         }
-
-        return String.format("%s%s", new DecimalFormat("###.##", new DecimalFormatSymbols(Locale.ITALIAN)).format(value), arr[i]);
+        String formatted = DECIMAL_FORMAT.get().format(value);
+        return formatted + SUFFIXES[idx];
     }
 
     public static String format(double value) {
-        String[] arr = {"", "k", "M", "B", "T", "Q", "KQ"};
-
-        int i= 0;
+        int idx = 0;
         while ((value / 1000) >= 1) {
-            value /= 1000;
-            i++;
+            value /= 1000d;
+            idx++;
         }
-
-        if(i >= arr.length) {
-            i = 5;
+        if (idx >= SUFFIXES.length) {
+            idx = 5;
         }
-
-        return String.format("%s%s", new DecimalFormat("###.##", new DecimalFormatSymbols(Locale.ITALIAN)).format(value), arr[i]);
+        String formatted = DECIMAL_FORMAT.get().format(value);
+        return formatted + SUFFIXES[idx];
     }
 }
