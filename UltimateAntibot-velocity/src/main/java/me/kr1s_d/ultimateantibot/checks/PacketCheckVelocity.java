@@ -1,5 +1,11 @@
 package me.kr1s_d.ultimateantibot.checks;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import me.kr1s_d.ultimateantibot.UltimateAntiBotVelocity;
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
@@ -9,8 +15,6 @@ import me.kr1s_d.ultimateantibot.common.service.WhitelistService;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.utils.Utils;
-
-import java.util.*;
 
 public class PacketCheckVelocity {
     private final IAntiBotPlugin iAntiBotPlugin;
@@ -73,8 +77,6 @@ public class PacketCheckVelocity {
                     suspected.add(user);
                 }
             });
-
-            suspected.removeIf(packetReceived::contains);
 
             if (suspected.size() >= ConfigManger.getPacketCheckConfig().getTrigger()) {
                 iAntiBotPlugin.getLogHelper().debug("Packet Check Executed!");

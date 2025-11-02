@@ -1,9 +1,13 @@
 package me.kr1s_d.ultimateantibot.common.core.thread;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.INotificator;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
+import me.kr1s_d.ultimateantibot.common.utils.PlaceholderFormatter;
 
 public class AttackAnalyzerThread {
 
@@ -37,20 +41,16 @@ public class AttackAnalyzerThread {
         if(bt >= 1){
             bt = 1;
         }
+        Map<String, String> placeholders = new HashMap<>(4);
+        placeholders.put("%perc%", String.valueOf(botpercent));
+        placeholders.put("%old%", String.valueOf(lastAnalyzedBot));
+        placeholders.put("%new%", String.valueOf(connections));
         if (connections > lastAnalyzedBot) {
-            notificator.sendBossBarMessage(MessageManager.attackAnalyzerIncrease
-                    .replace("%perc%", String.valueOf(botpercent))
-                    .replace("%old%", String.valueOf(lastAnalyzedBot))
-                    .replace("%new%", String.valueOf(connections))
-            , bt);
+            notificator.sendBossBarMessage(PlaceholderFormatter.apply(MessageManager.attackAnalyzerIncrease, placeholders), bt);
             //increase
         } else {
             if(connections < lastAnalyzedBot){
-                notificator.sendBossBarMessage(MessageManager.attackAnalyzerDecrease
-                        .replace("%perc%", String.valueOf(botpercent))
-                        .replace("%old%", String.valueOf(lastAnalyzedBot))
-                        .replace("%new%", String.valueOf(connections))
-                , bt);
+                notificator.sendBossBarMessage(PlaceholderFormatter.apply(MessageManager.attackAnalyzerDecrease, placeholders), bt);
             }
             //decrease
         }

@@ -1,18 +1,19 @@
 package me.kr1s_d.ultimateantibot.utils;
 
-import me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot;
-import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+
+import me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 
 public class Utils {
 
@@ -38,7 +39,7 @@ public class Utils {
     }
 
     public static List<String> coloraLista(List<String> col){
-        List<String> a = new ArrayList<>();
+        List<String> a = new ArrayList<>(col.size());
         for(String c : col){
             a.add(colora(c));
         }
@@ -46,9 +47,7 @@ public class Utils {
     }
 
     public static void disconnectAll(List<String> str, String reason){
-        str.forEach(ip -> {
-            UltimateAntiBotSpigot.getInstance().disconnect(ip, reason);
-        });
+        str.forEach(ip -> UltimateAntiBotSpigot.getInstance().disconnect(ip, reason));
     }
 
     public static void sendActionbar(Player player, String message) {

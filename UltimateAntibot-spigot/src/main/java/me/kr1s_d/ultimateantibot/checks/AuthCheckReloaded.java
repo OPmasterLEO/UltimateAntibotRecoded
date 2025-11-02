@@ -1,5 +1,15 @@
 package me.kr1s_d.ultimateantibot.checks;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.bukkit.Bukkit;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.server.ServerListPingEvent;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
+
 import me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot;
 import me.kr1s_d.ultimateantibot.common.AttackType;
 import me.kr1s_d.ultimateantibot.common.AuthCheckType;
@@ -15,15 +25,6 @@ import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
 import me.kr1s_d.ultimateantibot.utils.Utils;
-import org.bukkit.Bukkit;
-import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
-import org.bukkit.event.server.ServerListPingEvent;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class AuthCheckReloaded {
     private final IAntiBotPlugin plugin;
@@ -97,7 +98,7 @@ public class AuthCheckReloaded {
             if (pingRequired != 0 && currentIPPings == pingRequired) {
                 //0#134
                 String i = checkInitiator.getOrDefault(ip, null);
-                if(i.equals(e.getName())) {
+                if(e.getName().equals(i)) {
                     //checking connection
                     if (ConfigManger.getProxyCheckConfig().isCheckFastJoin() && !hasFailedThisCheck(ip, 2)) {
                         VPNService.submitIP(ip, e.getName());
@@ -227,7 +228,7 @@ public class AuthCheckReloaded {
      * @return Ritorna se ha completato il check del ping e può procedere con il resto dei controlli
      */
     private boolean hasCompletedPingCheck(String ip){
-        return completedCheck.get(ip) != null && completedCheck.get(ip).equals(AuthCheckType.PING);
+        return completedCheck.get(ip) == AuthCheckType.PING;
     }
 
     /**
@@ -236,7 +237,7 @@ public class AuthCheckReloaded {
      * @return Ritorna se il player sta eseguendo il ping check
      */
     private boolean isCompletingPingCheck(String ip){
-        return checking.get(ip) != null && checking.get(ip).equals(AuthCheckType.PING);
+        return checking.get(ip) == AuthCheckType.PING;
     }
 
     /**
@@ -244,7 +245,7 @@ public class AuthCheckReloaded {
      * @return Ritorna se il player è stato confermato e può entrare
      */
     private boolean isWaitingResponse(String ip){
-        return completedCheck.get(ip) != null && completedCheck.get(ip).equals(AuthCheckType.WAITING);
+        return completedCheck.get(ip) == AuthCheckType.WAITING;
     }
 
     /**
@@ -275,11 +276,7 @@ public class AuthCheckReloaded {
      * @param ip IP da controllare
      */
     private void registerPing(String ip){
-        if(pingMap.containsKey(ip)){
-            pingMap.get(ip).increase();
-        }else{
-            pingMap.put(ip, new FancyInteger(0));
-        }
+        pingMap.computeIfAbsent(ip, j -> new FancyInteger(0)).increase();
     }
 
     /**
