@@ -19,6 +19,9 @@ public class Notificator implements INotificator {
     private static final List<Player> titles = new ArrayList<>();
     private static final List<Player> bar = new ArrayList<>();
     private static final BossBar BOSS = BossBar.bossBar(Utils.colora("&fWaiting for a new attack!"), 1, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
+    private String lastActionbarRaw;
+    private String lastTitleRaw;
+    private String lastSubtitleRaw;
 
     public static void automaticNotification(Player player) {
         if(actionbars.contains(player)) return;
@@ -116,20 +119,41 @@ public class Notificator implements INotificator {
 
     public void init(IAntiBotPlugin plugin){
         plugin.scheduleRepeatingTask(() -> {
-            if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
-            }
-            if(plugin.getAntiBotManager().isPacketModeEnabled()) {
-                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
-                sendActionbar(msg);
+            if (titles.isEmpty() && actionbars.isEmpty()) {
                 return;
             }
             if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
-                sendActionbar(msg);
+                String rawTitle = plugin.getAntiBotManager().replaceInfo(MessageManager.titleTitle);
+                String rawSubtitle = plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle);
+                if (!rawTitle.equals(lastTitleRaw) || !rawSubtitle.equals(lastSubtitleRaw)) {
+                    lastTitleRaw = rawTitle;
+                    lastSubtitleRaw = rawSubtitle;
+                    sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
+                }
+            }
+            if(plugin.getAntiBotManager().isPacketModeEnabled()) {
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    net.kyori.adventure.text.Component msg = Utils.colora(raw);
+                    sendActionbar(msg);
+                }
+                return;
+            }
+            if(plugin.getAntiBotManager().isSomeModeOnline()) {
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    net.kyori.adventure.text.Component msg = Utils.colora(raw);
+                    sendActionbar(msg);
+                }
             }else{
-                net.kyori.adventure.text.Component msg = Utils.colora(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
-                sendActionbar(msg);
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    net.kyori.adventure.text.Component msg = Utils.colora(raw);
+                    sendActionbar(msg);
+                }
             }
         }, false, 125L);
     }

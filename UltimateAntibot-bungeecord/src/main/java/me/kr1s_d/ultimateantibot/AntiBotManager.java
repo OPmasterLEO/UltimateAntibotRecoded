@@ -17,6 +17,7 @@ import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.Formatter;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import me.kr1s_d.ultimateantibot.common.utils.PlaceholderFormatter;
 import me.kr1s_d.ultimateantibot.event.AttackStateEvent;
 import me.kr1s_d.ultimateantibot.event.ModeEnableEvent;
 import me.kr1s_d.ultimateantibot.utils.EventCaller;
@@ -306,6 +307,8 @@ public class AntiBotManager implements IAntiBotManager {
             case PING:
                 enablePingMode();
                 break;
+            default:
+                break;
         }
     }
 
@@ -354,20 +357,22 @@ public class AntiBotManager implements IAntiBotManager {
     String underVerification = String.valueOf(VPNService.getUnderVerificationSize());
     String attackTypes = attackWatcher.getFiredAttacks().toString();
 
-    return str
-        .replace("%bots%", String.valueOf(bots))
-        .replace("%pings%", String.valueOf(pings))
-        .replace("%queue%", String.valueOf(queue))
-        .replace("%whitelist%", String.valueOf(whitelist))
-        .replace("%blacklist%", String.valueOf(blacklist))
-        .replace("%type%", type)
-        .replace("%packets%", String.valueOf(packets))
-        .replace("%totalbots%", totalBots)
-        .replace("%totalpings%", totalPings)
-        .replace("%totalpackets%", totalPackets)
-        .replace("%latency%", latency)
-        .replace("%prefix%", prefix)
-        .replace("%underverification%", underVerification)
-        .replace("%attack-types%", attackTypes);
+    java.util.Map<String, String> values = new java.util.HashMap<>(16);
+    values.put("%bots%", String.valueOf(bots));
+    values.put("%pings%", String.valueOf(pings));
+    values.put("%queue%", String.valueOf(queue));
+    values.put("%whitelist%", String.valueOf(whitelist));
+    values.put("%blacklist%", String.valueOf(blacklist));
+    values.put("%type%", type);
+    values.put("%packets%", String.valueOf(packets));
+    values.put("%totalbots%", totalBots);
+    values.put("%totalpings%", totalPings);
+    values.put("%totalpackets%", totalPackets);
+    values.put("%latency%", latency);
+    values.put("%prefix%", prefix);
+    values.put("%underverification%", underVerification);
+    values.put("%attack-types%", attackTypes);
+
+    return PlaceholderFormatter.apply(str, values);
     }
 }

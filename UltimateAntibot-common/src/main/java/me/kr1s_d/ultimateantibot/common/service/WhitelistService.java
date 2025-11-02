@@ -1,14 +1,20 @@
 package me.kr1s_d.ultimateantibot.common.service;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+
 import me.kr1s_d.ultimateantibot.common.IConfiguration;
 import me.kr1s_d.ultimateantibot.common.IService;
 import me.kr1s_d.ultimateantibot.common.UnderAttackMethod;
 import me.kr1s_d.ultimateantibot.common.helper.LogHelper;
 import me.kr1s_d.ultimateantibot.common.objects.profile.entry.WhitelistEntry;
-
-import java.util.*;
 
 public class WhitelistService implements IService {
     private final QueueService queueService;
@@ -127,6 +133,6 @@ public class WhitelistService implements IService {
     }
 
     public Collection<String> getWhitelistedIPS() {
-        return whitelist.asMap().entrySet().stream().collect(ArrayList::new, (accumulator, a) -> accumulator.add(a.getKey()), (a, b) -> {});
+        return new ArrayList<>(whitelist.asMap().keySet());
     }
 }

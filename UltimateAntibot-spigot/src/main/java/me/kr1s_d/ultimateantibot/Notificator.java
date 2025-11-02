@@ -18,6 +18,9 @@ public class Notificator implements INotificator {
     private static final List<Player> actionbars = new ArrayList<>();
     private static final List<Player> titles = new ArrayList<>();
     private static final KBossBar bar = new KBossBar();
+    private String lastActionbarRaw;
+    private String lastTitleRaw;
+    private String lastSubtitleRaw;
 
     public static void automaticNotification(Player player) {
         if(actionbars.contains(player)) return;
@@ -98,20 +101,41 @@ public class Notificator implements INotificator {
 
     public void init(IAntiBotPlugin plugin){
         plugin.scheduleRepeatingTask(() -> {
+            if (titles.isEmpty() && actionbars.isEmpty() && (!bar.isSupported() || bar.getPlayers().isEmpty())) {
+                return;
+            }
             if(plugin.getAntiBotManager().isSomeModeOnline()){
-                sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
+                String rawTitle = plugin.getAntiBotManager().replaceInfo(MessageManager.titleTitle);
+                String rawSubtitle = plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle);
+                if (!rawTitle.equals(lastTitleRaw) || !rawSubtitle.equals(lastSubtitleRaw)) {
+                    lastTitleRaw = rawTitle;
+                    lastSubtitleRaw = rawSubtitle;
+                    sendTitle(MessageManager.titleTitle, plugin.getAntiBotManager().replaceInfo(MessageManager.titleSubtitle));
+                }
             }
             if(plugin.getAntiBotManager().isPacketModeEnabled()){
-                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets));
-                sendActionbar(msg);
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarPackets);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    String msg = ServerUtil.colorize(raw);
+                    sendActionbar(msg);
+                }
                 return;
             }
             if(plugin.getAntiBotManager().isSomeModeOnline()) {
-                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode));
-                sendActionbar(msg);
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarAntiBotMode);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    String msg = ServerUtil.colorize(raw);
+                    sendActionbar(msg);
+                }
             }else{
-                String msg = ServerUtil.colorize(plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline));
-                sendActionbar(msg);
+                String raw = plugin.getAntiBotManager().replaceInfo(MessageManager.actionbarOffline);
+                if (!raw.equals(lastActionbarRaw)) {
+                    lastActionbarRaw = raw;
+                    String msg = ServerUtil.colorize(raw);
+                    sendActionbar(msg);
+                }
             }
         }, false, 125L);
     }
