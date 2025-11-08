@@ -1,5 +1,11 @@
 package me.kr1s_d.ultimateantibot.common.checks.impl;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.checks.CheckType;
@@ -8,32 +14,26 @@ import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
 import me.kr1s_d.ultimateantibot.common.service.CheckService;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 public class InvalidNameCheck implements JoinCheck {
     private final IAntiBotPlugin plugin;
     private final IAntiBotManager antiBotManager;
     private final List<String> invalidNames;
-    private final List<String> regexes;
+    private final List<Pattern> compiledPatterns;
     
     public InvalidNameCheck(IAntiBotPlugin plugin) {
         this.plugin = plugin;
         this.antiBotManager = plugin.getAntiBotManager();
         this.invalidNames = new ArrayList<>();
-        this.regexes = new ArrayList<>();
+        this.compiledPatterns = new ArrayList<>();
 
         for (String invalidNamesBlockedEntry : ConfigManger.invalidNamesBlockedEntries) {
             try {
                 if(invalidNamesBlockedEntry.startsWith("REGEX-")) {
                     String regexFormula = invalidNamesBlockedEntry.split("-", 2)[1];
-                    regexes.add(regexFormula);
+                    compiledPatterns.add(Pattern.compile(regexFormula, Pattern.CASE_INSENSITIVE));
                     plugin.getLogHelper().debug("[REGEX VALIDATOR] Input: " + regexFormula + " complete array: " + Arrays.toString(invalidNamesBlockedEntry.split("-", 2)));
                 }else{
-                    invalidNames.add(invalidNamesBlockedEntry);
+                    invalidNames.add(invalidNamesBlockedEntry.toLowerCase());
                 }
             }catch (Exception e) {
                 plugin.getLogHelper().error("Unable to validate regex for input " + invalidNamesBlockedEntry);
@@ -51,19 +51,17 @@ public class InvalidNameCheck implements JoinCheck {
 
     @Override
     public boolean isDenied(String ip, String name) {
+        String nameLower = name.toLowerCase();
         for(String blacklisted : invalidNames){
-            blacklisted = blacklisted.toLowerCase();
-            
-            if(name.toLowerCase().contains(blacklisted)) {
+            if(nameLower.contains(blacklisted)) {
                 antiBotManager.getBlackListService().blacklist(ip, BlackListReason.STRANGE_PLAYER_INVALID_NAME, name);
                 plugin.getLogHelper().debug("[UAB DEBUG] Detected attack on InvalidNameCheck! (name)");
                 return true;
             }
         }
 
-        for (String regex : regexes) {
+        for (Pattern pattern : compiledPatterns) {
             try {
-                Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
                 Matcher matcher = pattern.matcher(name);
 
                 if(matcher.matches()) {
@@ -72,7 +70,7 @@ public class InvalidNameCheck implements JoinCheck {
                     return true;
                 }
             }catch (Exception e){
-                plugin.getLogHelper().error("Unable to validate regex for input " + regex);
+                plugin.getLogHelper().error("Unable to validate regex for pattern " + pattern.pattern());
             }
         }
         

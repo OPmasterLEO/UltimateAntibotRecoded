@@ -1,5 +1,10 @@
 package me.kr1s_d.ultimateantibot.common.checks.impl;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.checks.ChatCheck;
@@ -10,11 +15,6 @@ import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
 import me.kr1s_d.ultimateantibot.common.service.CheckService;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class RegisterCheck implements ChatCheck {
     private final IAntiBotPlugin plugin;
@@ -55,8 +55,8 @@ public class RegisterCheck implements ChatCheck {
         //skip if whitelisted
         if(plugin.getAntiBotManager().getWhitelistService().isWhitelisted(ip)) return;
 
-        String[] split = message.split("\\s+");
-        if (split.length < 1) return;
+        String[] split = message.split("\\s+", 3);
+        if (split.length < 2) return;
 
 
         String password = split[1];
@@ -131,20 +131,15 @@ public class RegisterCheck implements ChatCheck {
     }
 
     private boolean isTrackedRegisterCommand(String message) {
+        int spaceIdx = message.indexOf(' ');
+        if (spaceIdx == -1) return false;
+        
+        String cmd = message.substring(0, spaceIdx);
         for (String str : trackedCommands) {
-            if (message.split("\\s+")[0].equalsIgnoreCase(str) && hasPassword(message)) return true;
+            if (cmd.equalsIgnoreCase(str)) return true;
         }
 
         return false;
-    }
-
-    private boolean hasPassword(String message) {
-        try {
-            String[] arr = message.split("\\s+");
-            return arr.length > 1;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     private void registerPassword(String ip, String nickname, String password) {
@@ -164,22 +159,31 @@ public class RegisterCheck implements ChatCheck {
     }
 
     private List<String> getSamePasswordIPS(String password) {
-        return ipPasswordMap.entrySet()
-                .stream()
-                .filter(s -> s.getValue().equalsIgnoreCase(password))
-                .collect(ArrayList::new, (list, entry) -> list.add(entry.getKey()), (a, b) -> {
-                });
+        List<String> result = new ArrayList<>();
+        for (Map.Entry<String, String> entry : ipPasswordMap.entrySet()) {
+            if (entry.getValue().equalsIgnoreCase(password)) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
     }
 
     private List<String> getOverLimitPasswords() {
-        return passwordScore.entrySet()
-                .stream()
-                .filter(s -> s.getValue().get() >= ConfigManger.registerCheckLimit)
-                .collect(ArrayList::new, (list, entry) -> list.add(entry.getKey()), (a, b) -> {
-                });
+        List<String> result = new ArrayList<>();
+        for (Map.Entry<String, FancyInteger> entry : passwordScore.entrySet()) {
+            if (entry.getValue().get() >= ConfigManger.registerCheckLimit) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
     }
 
     private boolean isLimitReached() {
-        return passwordScore.entrySet().stream().anyMatch(s -> s.getValue().get() >= ConfigManger.registerCheckLimit);
+        for (FancyInteger score : passwordScore.values()) {
+            if (score.get() >= ConfigManger.registerCheckLimit) {
+                return true;
+            }
+        }
+        return false;
     }
 }

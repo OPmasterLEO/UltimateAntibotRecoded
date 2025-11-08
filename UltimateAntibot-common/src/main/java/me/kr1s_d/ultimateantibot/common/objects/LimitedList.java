@@ -35,14 +35,12 @@ public class LimitedList<E> implements Iterable<E>, Serializable {
     }
 
     public boolean matches(Predicate<E> element) {
-        boolean result = false;
-
         for (E e : list) {
-            if(result) break;
-            result = element.test(e);
+            if (element.test(e)) {
+                return true;
+            }
         }
-
-        return result;
+        return false;
     }
 
     public void remove(E element){

@@ -1,7 +1,5 @@
 package me.kr1s_d.ultimateantibot.common.utils;
 
-import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -24,15 +22,15 @@ public class RuntimeUtil {
     public static String executeAndGetOutput(String command) {
         try {
             String[] args = new String[] {"/bin/bash", "-c", command};
-            StringBuilder stringBuilder = new StringBuilder();
+            StringBuilder stringBuilder = new StringBuilder(256);
             Process process = new ProcessBuilder(args).start();
             BufferedReader bufferedReader1 = new BufferedReader(new InputStreamReader(process.getInputStream()));
             BufferedReader bufferedReader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
             String str;
             while ((str = bufferedReader1.readLine()) != null)
-                stringBuilder.append(str);
+                stringBuilder.append(str).append('\n');
             while ((str = bufferedReader2.readLine()) != null)
-                stringBuilder.append(str);
+                stringBuilder.append(str).append('\n');
             return stringBuilder.toString();
         } catch (IOException e) {
             ServerUtil.getInstance().getLogHelper().error("An error occurred while dispatching: " + command + ", message -> " + e.getMessage());
