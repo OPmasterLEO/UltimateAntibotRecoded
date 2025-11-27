@@ -1,9 +1,9 @@
 package me.kr1s_d.ultimateantibot.common.checks.impl;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
@@ -31,9 +31,9 @@ public class RegisterCheck implements ChatCheck {
     public RegisterCheck(IAntiBotPlugin plugin) {
         this.plugin = plugin;
         this.antiBotManager = plugin.getAntiBotManager();
-        this.passwordScore = new HashMap<>();
-        this.ipPasswordMap = new HashMap<>();
-        this.nicknamePasswordMap = new HashMap<>();
+        this.passwordScore = new ConcurrentHashMap<>();
+        this.ipPasswordMap = new ConcurrentHashMap<>();
+        this.nicknamePasswordMap = new ConcurrentHashMap<>();
 
         this.trackedCommands = ConfigManger.registerCheckCommandListeners;
 

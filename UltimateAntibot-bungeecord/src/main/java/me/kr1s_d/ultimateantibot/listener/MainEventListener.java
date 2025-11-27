@@ -6,10 +6,23 @@ import me.kr1s_d.ultimateantibot.checks.PacketCheck;
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.checks.CheckType;
-import me.kr1s_d.ultimateantibot.common.checks.impl.*;
+import me.kr1s_d.ultimateantibot.common.checks.impl.AccountCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.ConnectionAnalyzerCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.FirstJoinCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.InvalidNameCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.LegalNameCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.NameChangerCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.RegisterCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.SlowJoinCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.SuperJoinCheck;
 import me.kr1s_d.ultimateantibot.common.core.tasks.AutoWhitelistTask;
 import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
-import me.kr1s_d.ultimateantibot.common.service.*;
+import me.kr1s_d.ultimateantibot.common.service.BlackListService;
+import me.kr1s_d.ultimateantibot.common.service.CheckService;
+import me.kr1s_d.ultimateantibot.common.service.QueueService;
+import me.kr1s_d.ultimateantibot.common.service.UserDataService;
+import me.kr1s_d.ultimateantibot.common.service.VPNService;
+import me.kr1s_d.ultimateantibot.common.service.WhitelistService;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
@@ -17,7 +30,13 @@ import me.kr1s_d.ultimateantibot.utils.Utils;
 import me.kr1s_d.ultimateantibot.utils.component.KComponentBuilder;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.event.*;
+import net.md_5.bungee.api.event.ChatEvent;
+import net.md_5.bungee.api.event.PlayerDisconnectEvent;
+import net.md_5.bungee.api.event.PostLoginEvent;
+import net.md_5.bungee.api.event.PreLoginEvent;
+import net.md_5.bungee.api.event.ProxyPingEvent;
+import net.md_5.bungee.api.event.ServerSwitchEvent;
+import net.md_5.bungee.api.event.SettingsChangedEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 
@@ -81,16 +100,33 @@ public class MainEventListener implements Listener {
         }
 
         //
-        //BlackList & Whitelist Checks
+        //BlackList Check
         //
         if (blackListService.isBlackListed(ip)) {
             e.setCancelReason(blacklistMSG(ip));
             e.setCancelled(true);
             return;
         }
-        if (whitelistService.isWhitelisted(ip)) {
-            antiBotManager.getDynamicJoins().decrease();
+        //
+        // Invalid Name Check - runs for ALL players including whitelisted
+        //
+        if (invalidNameCheck.isDenied(ip, name)) {
+            e.setCancelReason(blacklistMSG(ip));
+            e.setCancelled(true);
             return;
+        }
+        //
+        //Legal Name Check - runs for ALL players
+        //
+        if (legalNameCheck.isDenied(ip, name)) {
+            e.setCancelReason(blacklistMSG(ip));
+            e.setCancelled(true);
+            return;
+        }
+        
+        boolean isWhitelisted = whitelistService.isWhitelisted(ip);
+        if (isWhitelisted) {
+            antiBotManager.getDynamicJoins().decrease();
         }
 
         //
@@ -99,18 +135,20 @@ public class MainEventListener implements Listener {
         if (antiBotManager.getSpeedJoinPerSecond() >= ConfigManger.antiBotModeTrigger) {
             if (!antiBotManager.isAntiBotModeEnabled()) {
                 antiBotManager.enableAntiBotMode();
-                e.setCancelReason(KComponentBuilder.colorized(
-                        MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))
-                ));
-                e.setCancelled(true);
-                return;
+                if (!isWhitelisted) {
+                    e.setCancelReason(KComponentBuilder.colorized(
+                            MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))
+                    ));
+                    e.setCancelled(true);
+                    return;
+                }
             }
         }
 
         //
-        // NameChangerCheck
+        // NameChangerCheck - skip for whitelisted
         //
-        if (nameChangerCheck.isDenied(ip, name)) {
+        if (!isWhitelisted && nameChangerCheck.isDenied(ip, name)) {
             blackListService.blacklist(ip, BlackListReason.TOO_MUCH_NAMES, name);
             e.setCancelReason(blacklistMSG(ip));
             e.setCancelled(true);
@@ -120,32 +158,14 @@ public class MainEventListener implements Listener {
         //
         //Queue Service
         //
-        if (!queueService.isQueued(ip) && !blackListService.isBlackListed(ip) && !whitelistService.isWhitelisted(ip)) {
+        if (!queueService.isQueued(ip) && !blackListService.isBlackListed(ip) && !isWhitelisted) {
             queueService.queue(ip);
         }
 
         //
-        //Legal Name Check
+        // SuperJoinCheck - skip for whitelisted
         //
-        if (legalNameCheck.isDenied(ip, name)) {
-            e.setCancelReason(blacklistMSG(ip));
-            e.setCancelled(true);
-            return;
-        }
-
-        //
-        // Invalid Name Check
-        //
-        if (invalidNameCheck.isDenied(ip, name)) {
-            e.setCancelReason(blacklistMSG(ip));
-            e.setCancelled(true);
-            return;
-        }
-
-        //
-        // SuperJoinCheck
-        //
-        if (superJoinCheck.isDenied(ip, name)) {
+        if (!isWhitelisted && superJoinCheck.isDenied(ip, name)) {
             blackListService.blacklist(ip, BlackListReason.TOO_MUCH_JOINS, name);
             e.setCancelReason(blacklistMSG(ip));
             e.setCancelled(true);
@@ -153,17 +173,17 @@ public class MainEventListener implements Listener {
         }
 
         //
-        //Auth Check
+        //Auth Check - runs when antibot mode is enabled
         //
-        if (ServerUtil.blacklistPercentage >= ConfigManger.authPercent && antiBotManager.isAntiBotModeEnabled()) {
+        if (antiBotManager.isAntiBotModeEnabled() && ServerUtil.blacklistPercentage >= ConfigManger.authPercent) {
             authCheck.onJoin(e, ip);
             return;
         }
 
         //
-        //AntiBotMode Normal
+        //AntiBotMode Normal - skip for whitelisted
         //
-        if (antiBotManager.isAntiBotModeEnabled() || antiBotManager.isSlowAntiBotModeEnabled()) {
+        if (!isWhitelisted && (antiBotManager.isAntiBotModeEnabled() || antiBotManager.isSlowAntiBotModeEnabled())) {
             e.setCancelReason(KComponentBuilder.colorized(
                     MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))
             ));
@@ -177,7 +197,6 @@ public class MainEventListener implements Listener {
         if (firstJoinCheck.isDenied(ip, name)) {
             e.setCancelReason(KComponentBuilder.colorized(MessageManager.firstJoinMessage));
             e.setCancelled(true);
-            return;
         }
     }
 

@@ -1,7 +1,7 @@
 package me.kr1s_d.ultimateantibot;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.bukkit.entity.Player;
 
@@ -15,8 +15,8 @@ import me.kr1s_d.ultimateantibot.utils.Utils;
 import me.kr1s_d.ultimateantibot.utils.Version;
 
 public class Notificator implements INotificator {
-    private static final List<Player> actionbars = new ArrayList<>();
-    private static final List<Player> titles = new ArrayList<>();
+    private static final List<Player> actionbars = new CopyOnWriteArrayList<>();
+    private static final List<Player> titles = new CopyOnWriteArrayList<>();
     private static final KBossBar bar = new KBossBar();
     private String lastActionbarRaw;
     private String lastTitleRaw;

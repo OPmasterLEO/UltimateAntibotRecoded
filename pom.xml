@@ -19,12 +19,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.13.0</version>
+                    <version>3.14.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.2.4</version>
+                    <version>3.6.1</version>
                     <configuration>
                         <relocations>
                             <relocation>
@@ -64,6 +64,12 @@
                                 <pattern>org.bspfsystems.yamlconfiguration</pattern>
                                 <shadedPattern>me.kr1s_d.ultimateantibot.libs.yamlconfig</shadedPattern>
                             </relocation>
+                            <!-- UniversalScheduler -->
+                            <relocation>
+                                <pattern>com.github.Anon8281.universalScheduler</pattern>
+                                <!-- Don't forget to replace -->
+                                <shadedPattern>me.kr1s_d.ultimateantibot.libs.universalScheduler</shadedPattern>
+                            </relocation>
                         </relocations>
                     </configuration>
                     <executions>
@@ -87,14 +93,14 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.10.1</version>
+            <version>2.13.2</version>
             <scope>compile</scope>
         </dependency>
         <!-- JSON Handler -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.14.0</version>
+            <version>2.20.1</version>
             <scope>compile</scope>
         </dependency>
         <!-- ApacheHTTPClient -->
@@ -108,7 +114,7 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <version>2.9.3</version>
+            <version>3.2.3</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

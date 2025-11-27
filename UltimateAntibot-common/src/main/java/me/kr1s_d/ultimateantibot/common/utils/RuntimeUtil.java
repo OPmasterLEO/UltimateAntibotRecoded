@@ -4,13 +4,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Arrays;
-import java.util.stream.Stream;
 
 public class RuntimeUtil {
     public static Process execute(String... command) {
         try {
-            String[] args = new String[]{"/bin/bash", "-c"};
-            String[] commands = Stream.concat(Arrays.stream(args), Arrays.stream(command)).toArray(String[]::new);
+            String[] commands = new String[2 + command.length];
+            commands[0] = "/bin/bash";
+            commands[1] = "-c";
+            System.arraycopy(command, 0, commands, 2, command.length);
             return new ProcessBuilder(commands).start();
         } catch (IOException e) {
             ServerUtil.getInstance().getLogHelper().error("An error occurred while dispatching: " + Arrays.toString(command) + ", message -> " + e.getMessage());

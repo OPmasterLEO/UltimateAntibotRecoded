@@ -1,7 +1,7 @@
 package me.kr1s_d.ultimateantibot.checks;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Bukkit;
@@ -42,14 +42,14 @@ public class AuthCheckReloaded {
     public AuthCheckReloaded(IAntiBotPlugin plugin) {
         this.plugin = plugin;
         this.antiBotManager = plugin.getAntiBotManager();
-        this.checking = new HashMap<>();
-        this.completedCheck = new HashMap<>();
-        this.pingMap = new HashMap<>();
-        this.pingData = new HashMap<>();
-        this.failure = new HashMap<>();
+        this.checking = new ConcurrentHashMap<>();
+        this.completedCheck = new ConcurrentHashMap<>();
+        this.pingMap = new ConcurrentHashMap<>();
+        this.pingData = new ConcurrentHashMap<>();
+        this.failure = new ConcurrentHashMap<>();
         this.taskScheduler = Bukkit.getScheduler();
-        this.runningTasks = new HashMap<>();
-        this.checkInitiator = new HashMap<>();
+        this.runningTasks = new ConcurrentHashMap<>();
+        this.checkInitiator = new ConcurrentHashMap<>();
         this.VPNService = plugin.getVPNService();
         plugin.getLogHelper().debug("Loaded " + this.getClass().getSimpleName() + "!");
     }
@@ -61,8 +61,8 @@ public class AuthCheckReloaded {
             registerPing(ip);
             //Durante L'antibotMode:
             if(antiBotManager.isAntiBotModeEnabled()){
-                int currentIPPings = pingMap.get(ip).get();
-                int pingRequired = pingData.get(ip);
+                    int currentIPPings = pingMap.get(ip).get();
+                    int pingRequired = pingData.getOrDefault(ip, 0);
                 //Impostazion e Dell'interfaccia per il conteggio dei ping
                 if(currentIPPings == pingRequired){
                     e.setMotd(ServerUtil.colorize(MessageManager.verifiedPingInterface));
@@ -170,10 +170,10 @@ public class AuthCheckReloaded {
      * @return Se ha superato il numero di ping
      */
     private boolean hasExceededPingLimit(String ip){
-        if(pingData.get(ip) == null || pingMap.get(ip) == null){
+        if(!pingData.containsKey(ip) || !pingMap.containsKey(ip)){
             return true;
         }
-        return pingMap.get(ip).get() > pingData.get(ip);
+        return pingMap.get(ip).get() > pingData.getOrDefault(ip, 0);
     }
 
     /**

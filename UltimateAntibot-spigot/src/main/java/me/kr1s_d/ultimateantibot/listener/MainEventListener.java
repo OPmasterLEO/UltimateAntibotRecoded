@@ -1,19 +1,5 @@
 package me.kr1s_d.ultimateantibot.listener;
 
-import me.kr1s_d.ultimateantibot.Notificator;
-import me.kr1s_d.ultimateantibot.checks.AuthCheckReloaded;
-import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
-import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-import me.kr1s_d.ultimateantibot.common.checks.CheckType;
-import me.kr1s_d.ultimateantibot.common.checks.impl.*;
-import me.kr1s_d.ultimateantibot.common.core.tasks.AutoWhitelistTask;
-import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
-import me.kr1s_d.ultimateantibot.common.service.*;
-import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
-import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
-import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
-import me.kr1s_d.ultimateantibot.utils.Utils;
-import me.kr1s_d.ultimateantibot.utils.component.KComponentBuilder;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -23,6 +9,33 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+
+import me.kr1s_d.ultimateantibot.Notificator;
+import me.kr1s_d.ultimateantibot.checks.AuthCheckReloaded;
+import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.checks.CheckType;
+import me.kr1s_d.ultimateantibot.common.checks.impl.AccountCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.ConnectionAnalyzerCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.FirstJoinCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.InvalidNameCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.LegalNameCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.NameChangerCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.RegisterCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.SlowJoinCheck;
+import me.kr1s_d.ultimateantibot.common.checks.impl.SuperJoinCheck;
+import me.kr1s_d.ultimateantibot.common.core.tasks.AutoWhitelistTask;
+import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
+import me.kr1s_d.ultimateantibot.common.service.BlackListService;
+import me.kr1s_d.ultimateantibot.common.service.CheckService;
+import me.kr1s_d.ultimateantibot.common.service.QueueService;
+import me.kr1s_d.ultimateantibot.common.service.UserDataService;
+import me.kr1s_d.ultimateantibot.common.service.VPNService;
+import me.kr1s_d.ultimateantibot.common.service.WhitelistService;
+import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
+import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import me.kr1s_d.ultimateantibot.utils.Utils;
 
 public class MainEventListener implements Listener {
     private final IAntiBotPlugin plugin;
@@ -80,30 +93,48 @@ public class MainEventListener implements Listener {
         }
 
         //
-        //BlackList & Whitelist Checks
+        //BlackList Check
         //
         if (blackListService.isBlackListed(ip)) {
             e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
             return;
         }
-        if (whitelistService.isWhitelisted(ip)) {
-            antiBotManager.getDynamicJoins().decrease();
+        //
+        // Invalid Name Check - runs for ALL players including whitelisted
+        //
+        if (invalidNameCheck.isDenied(ip, name)) {
+            e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
             return;
         }
+        //
+        //Legal Name Check - runs for ALL players
+        //
+        if (legalNameCheck.isDenied(ip, name)) {
+            e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
+            return;
+        }
+        
+        boolean isWhitelisted = whitelistService.isWhitelisted(ip);
+        if (isWhitelisted) {
+            antiBotManager.getDynamicJoins().decrease();
+        }
+        
         //
         //AntiBotMode Enable
         //
         if (antiBotManager.getSpeedJoinPerSecond() >= ConfigManger.antiBotModeTrigger) {
             if (!antiBotManager.isAntiBotModeEnabled()) {
                 antiBotManager.enableAntiBotMode();
-                e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Utils.colora(MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))));
-                return;
+                if (!isWhitelisted) {
+                    e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Utils.colora(MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))));
+                    return;
+                }
             }
         }
         //
-        // NameChangerCheck
+        // NameChangerCheck - skip for whitelisted
         //
-        if (nameChangerCheck.isDenied(ip, name)) {
+        if (!isWhitelisted && nameChangerCheck.isDenied(ip, name)) {
             blackListService.blacklist(ip, BlackListReason.TOO_MUCH_NAMES, name);
             e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
             return;
@@ -111,42 +142,28 @@ public class MainEventListener implements Listener {
         //
         //Queue Check
         //
-        if (!queueService.isQueued(ip) && !blackListService.isBlackListed(ip) && !whitelistService.isWhitelisted(ip)) {
+        if (!queueService.isQueued(ip) && !blackListService.isBlackListed(ip) && !isWhitelisted) {
             queueService.queue(ip);
         }
         //
-        //Legal Name Check
+        // SuperJoinCheck - skip for whitelisted
         //
-        if (legalNameCheck.isDenied(ip, name)) {
-            e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
-            return;
-        }
-        //
-        // SuperJoinCheck
-        //
-        if (superJoinCheck.isDenied(ip, name)) {
+        if (!isWhitelisted && superJoinCheck.isDenied(ip, name)) {
             blackListService.blacklist(ip, BlackListReason.TOO_MUCH_JOINS, name);
             e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
             return;
         }
         //
-        // Invalid Name Check
+        //Auth Check - runs when antibot mode is enabled
         //
-        if (invalidNameCheck.isDenied(ip, name)) {
-            e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, blacklistMSG(ip));
-            return;
-        }
-        //
-        //Auth Check
-        //
-        if (ServerUtil.blacklistPercentage >= ConfigManger.authPercent && antiBotManager.isAntiBotModeEnabled()) {
+        if (antiBotManager.isAntiBotModeEnabled() && ServerUtil.blacklistPercentage >= ConfigManger.authPercent) {
             authCheck.onJoin(e, ip);
             return;
         }
         //
-        //AntiBotMode Normal
+        //AntiBotMode Normal - skip for whitelisted
         //
-        if (antiBotManager.isAntiBotModeEnabled() || antiBotManager.isSlowAntiBotModeEnabled()) {
+        if (!isWhitelisted && (antiBotManager.isAntiBotModeEnabled() || antiBotManager.isSlowAntiBotModeEnabled())) {
             e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Utils.colora(MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))));
             return;
         }
@@ -156,7 +173,6 @@ public class MainEventListener implements Listener {
         //
         if (firstJoinCheck.isDenied(ip, name)) {
             e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Utils.colora(MessageManager.firstJoinMessage));
-            return;
         }
     }
 

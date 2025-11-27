@@ -1,14 +1,15 @@
 package me.kr1s_d.ultimateantibot.utils;
 
-import com.velocitypowered.api.proxy.Player;
-import me.kr1s_d.ultimateantibot.UltimateAntiBotVelocity;
-import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
-import net.kyori.adventure.text.Component;
-
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.velocitypowered.api.proxy.Player;
+
+import me.kr1s_d.ultimateantibot.UltimateAntiBotVelocity;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import net.kyori.adventure.text.Component;
 
 public class Utils {
     private Utils() {}
@@ -76,14 +77,19 @@ public class Utils {
     }
 
     public static List<Component> coloraLista(List<String> str){
-        List<Component> a = new ArrayList<>();
-        str.forEach(b -> a.add(colora(b)));
+        List<Component> a = new ArrayList<>(str.size());
+        for (String b : str) {
+            a.add(colora(b));
+        }
         return a;
     }
 
     public static List<String> calculatePlayerNames() {
-        List<String> a = new ArrayList<>();
-        UltimateAntiBotVelocity.getInstance().getServer().getAllPlayers().forEach(b -> a.add(b.getGameProfile().getName()));
+        List<Player> allPlayers = new ArrayList<>(UltimateAntiBotVelocity.getInstance().getServer().getAllPlayers());
+        List<String> a = new ArrayList<>(allPlayers.size());
+        for (Player b : allPlayers) {
+            a.add(b.getGameProfile().getName());
+        }
         return a;
     }
 }

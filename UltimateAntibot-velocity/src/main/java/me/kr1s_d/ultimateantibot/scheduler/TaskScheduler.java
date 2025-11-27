@@ -1,10 +1,10 @@
 package me.kr1s_d.ultimateantibot.scheduler;
 
-import com.velocitypowered.api.scheduler.ScheduledTask;
-import com.velocitypowered.api.scheduler.TaskStatus;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.velocitypowered.api.scheduler.ScheduledTask;
+import com.velocitypowered.api.scheduler.TaskStatus;
 
 public class TaskScheduler {
     private static final Map<Long, ScheduledTask> scheduled = new ConcurrentHashMap<>();
@@ -26,10 +26,9 @@ public class TaskScheduler {
     }
 
     private static void checkTasks() {
-        for (Map.Entry<Long, ScheduledTask> entry : scheduled.entrySet()) {
-            if(entry.getValue().status().equals(TaskStatus.CANCELLED) || entry.getValue().status().equals(TaskStatus.FINISHED)) {
-                scheduled.remove(entry.getKey());
-            }
-        }
+        scheduled.entrySet().removeIf(entry -> 
+            entry.getValue().status() == TaskStatus.CANCELLED || 
+            entry.getValue().status() == TaskStatus.FINISHED
+        );
     }
 }

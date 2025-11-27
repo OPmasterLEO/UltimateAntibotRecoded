@@ -1,6 +1,14 @@
 package me.kr1s_d.ultimateantibot.objects;
 
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.google.common.collect.Sets;
+
 import me.kr1s_d.ultimateantibot.common.BarColor;
 import me.kr1s_d.ultimateantibot.common.BarStyle;
 import me.kr1s_d.ultimateantibot.common.helper.LogHelper;
@@ -9,13 +17,6 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.chat.ComponentSerializer;
-
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class DynamicBar {
         private static final AtomicInteger barID = new AtomicInteger(1);
@@ -51,7 +52,9 @@ public class DynamicBar {
             if (visible) {
                 net.md_5.bungee.protocol.packet.BossBar packet = new net.md_5.bungee.protocol.packet.BossBar(uuid, 3);
                 updateBossBar(packet, new TextComponent(title));
-                this.players.forEach(player -> player.unsafe().sendPacket(packet));
+                for (ProxiedPlayer player : this.players) {
+                    player.unsafe().sendPacket(packet);
+                }
             }
         }
 
@@ -92,7 +95,9 @@ public class DynamicBar {
                 net.md_5.bungee.protocol.packet.BossBar packet = new net.md_5.bungee.protocol.packet.BossBar(uuid, 4);
                 packet.setColor(this.barColor.ordinal());
                 packet.setDivision(this.barStyle.ordinal());
-                this.players.forEach(player -> player.unsafe().sendPacket(packet));
+                for (ProxiedPlayer player : this.players) {
+                    player.unsafe().sendPacket(packet);
+                }
             }
         }
 
@@ -107,7 +112,9 @@ public class DynamicBar {
                 net.md_5.bungee.protocol.packet.BossBar packet = new net.md_5.bungee.protocol.packet.BossBar(uuid, 4);
                 packet.setColor(this.barColor.ordinal());
                 packet.setDivision(this.barStyle.ordinal());
-                this.players.forEach(player -> player.unsafe().sendPacket(packet));
+                for (ProxiedPlayer player : this.players) {
+                    player.unsafe().sendPacket(packet);
+                }
             }
         }
 
@@ -122,7 +129,9 @@ public class DynamicBar {
             if (visible) {
                 net.md_5.bungee.protocol.packet.BossBar packet = new net.md_5.bungee.protocol.packet.BossBar(uuid, 2);
                 packet.setHealth(this.progress);
-                this.players.forEach(player -> player.unsafe().sendPacket(packet));
+                for (ProxiedPlayer player : this.players) {
+                    player.unsafe().sendPacket(packet);
+                }
             }
         }
 
@@ -164,7 +173,9 @@ public class DynamicBar {
             this.visible = visible;
 
             net.md_5.bungee.protocol.packet.BossBar packet = visible ? getAddPacket() : getRemovePacket();
-            this.players.forEach(player -> player.unsafe().sendPacket(packet));
+            for (ProxiedPlayer player : this.players) {
+                player.unsafe().sendPacket(packet);
+            }
         }
 
         private net.md_5.bungee.protocol.packet.BossBar getAddPacket() {

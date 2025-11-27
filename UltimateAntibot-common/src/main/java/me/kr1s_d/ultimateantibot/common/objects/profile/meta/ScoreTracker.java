@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 public class ScoreTracker implements Serializable {
     private int CURRENT_SCORE;
@@ -21,15 +20,23 @@ public class ScoreTracker implements Serializable {
     }
 
     public List<ScoreAddition> getScoresByID(ScoreID id) {
-        return additionList.stream()
-                .filter(s -> s.id.equals(id))
-                .collect(Collectors.toList());
+        List<ScoreAddition> result = new ArrayList<>();
+        for (ScoreAddition s : additionList) {
+            if (s.id == id) {
+                result.add(s);
+            }
+        }
+        return result;
     }
 
     public List<ScoreAddition> getScoresByAmount(int amount) {
-        return additionList.stream()
-                .filter(s -> s.scoreAmount == amount)
-                .collect(Collectors.toList());
+        List<ScoreAddition> result = new ArrayList<>();
+        for (ScoreAddition s : additionList) {
+            if (s.scoreAmount == amount) {
+                result.add(s);
+            }
+        }
+        return result;
     }
 
     public List<ScoreAddition> getAdditionList() {
@@ -59,11 +66,12 @@ public class ScoreTracker implements Serializable {
      * @return if score has removed or not
      */
     public boolean removeScore(ScoreID scoreID, int score, ScoreDurationType type, boolean bulkRemoval) {
-        List<ScoreAddition> scores = additionList.stream()
-                .filter(s -> s.id.equals(scoreID))
-                .filter(s -> s.scoreAmount == score)
-                .filter(s ->  s.type == type)
-                .collect(Collectors.toList());
+        List<ScoreAddition> scores = new ArrayList<>();
+        for (ScoreAddition s : additionList) {
+            if (s.id == scoreID && s.scoreAmount == score && s.type == type) {
+                scores.add(s);
+            }
+        }
 
         if(scores.isEmpty()) return false;
 
@@ -73,7 +81,7 @@ public class ScoreTracker implements Serializable {
                 additionList.remove(addition);
             }
         }else {
-            ScoreAddition addition = scores.stream().findAny().get();
+            ScoreAddition addition = scores.get(0);
             removeScore0(addition.scoreAmount);
             additionList.remove(addition);
 
@@ -100,9 +108,12 @@ public class ScoreTracker implements Serializable {
     }
 
     public void expireScores(ScoreDurationType type) {
-        List<ScoreAddition> collect = additionList.stream()
-                .filter(s -> s.type.equals(type))
-                .collect(Collectors.toList());
+        List<ScoreAddition> collect = new ArrayList<>();
+        for (ScoreAddition s : additionList) {
+            if (s.type == type) {
+                collect.add(s);
+            }
+        }
 
         for (ScoreAddition scoreAddition : collect) {
             removeScore(scoreAddition.id, scoreAddition.scoreAmount, scoreAddition.type, true);
@@ -128,7 +139,7 @@ public class ScoreTracker implements Serializable {
         private final int scoreAmount;
         private final ScoreDurationType type;
         private final long removalDate;
-        private boolean isStackable;
+        private final boolean isStackable;
 
         public ScoreAddition(ScoreID id, int scoreAmount, ScoreDurationType type, long removalDate, boolean isStackable) {
             this.id = id;

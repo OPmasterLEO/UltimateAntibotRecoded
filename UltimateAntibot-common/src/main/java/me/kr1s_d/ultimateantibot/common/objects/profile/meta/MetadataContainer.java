@@ -1,7 +1,6 @@
 package me.kr1s_d.ultimateantibot.common.objects.profile.meta;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,9 +53,10 @@ public class MetadataContainer<K> implements Serializable, Iterable<K> {
     }
 
     public void removeIf(Predicate<K> tester) {
-        for (K k1 : dataMap.keySet()) {
-            if(tester.test(k1)) {
-                dataMap.remove(k1);
+        Iterator<K> iterator = dataMap.keySet().iterator();
+        while (iterator.hasNext()) {
+            if (tester.test(iterator.next())) {
+                iterator.remove();
             }
         }
     }

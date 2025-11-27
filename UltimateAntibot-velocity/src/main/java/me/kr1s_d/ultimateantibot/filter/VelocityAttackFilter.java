@@ -1,9 +1,9 @@
 package me.kr1s_d.ultimateantibot.filter;
 
-import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
-import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
-import me.kr1s_d.ultimateantibot.common.utils.FilterUtils;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.core.Filter;
@@ -11,8 +11,10 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.message.Message;
 
-import java.util.ArrayList;
-import java.util.List;
+import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
+import me.kr1s_d.ultimateantibot.common.utils.FilterUtils;
 
 public class VelocityAttackFilter implements Filter {
     private final IAntiBotManager antiBotManager;
@@ -23,6 +25,9 @@ public class VelocityAttackFilter implements Filter {
         this.blocked = new ArrayList<>();
         FilterUtils.populateDefaultFilter(blocked);
         blocked.addAll(antiBotPlugin.getConfigYml().getStringList("attack-filter"));
+        for (int i = 0; i < blocked.size(); i++) {
+            blocked.set(i, blocked.get(i).toLowerCase(Locale.ROOT));
+        }
     }
 
     public Result checkMessage(String record) {
@@ -41,8 +46,9 @@ public class VelocityAttackFilter implements Filter {
 
     public Result isDenied(String record) {
         if(antiBotManager.isAntiBotModeEnabled()) {
+            String rl = record.toLowerCase(Locale.ROOT);
             for (String str : blocked) {
-                if (record.toLowerCase().contains(str.toLowerCase())) {
+                if (rl.contains(str)) {
                     return Result.DENY;
                 }
             }
