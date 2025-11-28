@@ -1,8 +1,41 @@
 package me.kr1s_d.ultimateantibot;
 
+import java.io.File;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Logger;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
+
+import com.github.Anon8281.universalScheduler.UniversalScheduler;
+import com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler;
+import com.github.retrooper.packetevents.PacketEvents;
+
 import me.kr1s_d.commandframework.CommandManager;
-import me.kr1s_d.ultimateantibot.commands.*;
-import me.kr1s_d.ultimateantibot.common.*;
+import me.kr1s_d.ultimateantibot.commands.AddRemoveBlacklistCommand;
+import me.kr1s_d.ultimateantibot.commands.AddRemoveWhitelistCommand;
+import me.kr1s_d.ultimateantibot.commands.AttackLogCommand;
+import me.kr1s_d.ultimateantibot.commands.CacheCommand;
+import me.kr1s_d.ultimateantibot.commands.CheckIDCommand;
+import me.kr1s_d.ultimateantibot.commands.ClearCommand;
+import me.kr1s_d.ultimateantibot.commands.ConnectionProfileCommand;
+import me.kr1s_d.ultimateantibot.commands.DumpCommand;
+import me.kr1s_d.ultimateantibot.commands.FirewallCommand;
+import me.kr1s_d.ultimateantibot.commands.HelpCommand;
+import me.kr1s_d.ultimateantibot.commands.ReloadCommand;
+import me.kr1s_d.ultimateantibot.commands.StatsCommand;
+import me.kr1s_d.ultimateantibot.commands.ToggleNotificationCommand;
+import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.IConfiguration;
+import me.kr1s_d.ultimateantibot.common.INotificator;
+import me.kr1s_d.ultimateantibot.common.IServerPlatform;
+import me.kr1s_d.ultimateantibot.common.UABRunnable;
 import me.kr1s_d.ultimateantibot.common.core.UltimateAntiBotCore;
 import me.kr1s_d.ultimateantibot.common.core.server.SatelliteServer;
 import me.kr1s_d.ultimateantibot.common.core.thread.AnimationThread;
@@ -15,7 +48,11 @@ import me.kr1s_d.ultimateantibot.common.service.AttackTrackerService;
 import me.kr1s_d.ultimateantibot.common.service.FirewallService;
 import me.kr1s_d.ultimateantibot.common.service.UserDataService;
 import me.kr1s_d.ultimateantibot.common.service.VPNService;
-import me.kr1s_d.ultimateantibot.common.utils.*;
+import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
+import me.kr1s_d.ultimateantibot.common.utils.FilesUpdater;
+import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import me.kr1s_d.ultimateantibot.common.utils.Updater;
 import me.kr1s_d.ultimateantibot.listener.CustomEventListener;
 import me.kr1s_d.ultimateantibot.listener.MainEventListener;
 import me.kr1s_d.ultimateantibot.listener.PingListener;
@@ -25,19 +62,6 @@ import me.kr1s_d.ultimateantibot.objects.filter.BukkitAttackFilter;
 import me.kr1s_d.ultimateantibot.utils.Metrics;
 import me.kr1s_d.ultimateantibot.utils.Utils;
 import me.kr1s_d.ultimateantibot.utils.Version;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
-import com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler;
-import com.github.Anon8281.universalScheduler.UniversalScheduler;
-
-import java.io.File;
 
 public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotPlugin, IServerPlatform {
 
@@ -60,6 +84,12 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     private SatelliteServer satellite;
     private boolean isRunning;
     private static TaskScheduler universalScheduler;
+
+    @Override
+    public void onLoad() {
+        PacketEvents.getAPI().load();
+    }
+
 
     @Override
     public void onEnable() {
@@ -118,7 +148,6 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         this.core.load();
         ((Logger) LogManager.getRootLogger()).addFilter(new BukkitAttackFilter(this));
         ((Logger) LogManager.getRootLogger()).addFilter(new Bukkit247Filter(this));
-        satellite = new SatelliteServer(this);
         notificator = new Notificator();
         notificator.init(this);
         new AttackAnalyzerThread(this);
@@ -152,6 +181,15 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         Bukkit.getPluginManager().registerEvents(new PingListener(this), this);
         Bukkit.getPluginManager().registerEvents(new MainEventListener(this), this);
         Bukkit.getPluginManager().registerEvents(new CustomEventListener(this), this);
+        // PacketEvents initialization
+        try {
+            PacketEvents.getAPI().init();
+            // Register packet listener
+            PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
+            logHelper.info("PacketAntibotManager initialized (PacketEvents).");
+        } catch (Throwable t) {
+            logHelper.info("PacketEvents not available or failed to initialize: " + t.getMessage());
+        }
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to load");
         new Updater(this);
@@ -159,6 +197,7 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
 
     @Override
     public void onDisable() {
+        PacketEvents.getAPI().terminate();
         long a = System.currentTimeMillis();
         logHelper.info("&cUnloading...");
         this.isRunning = false;
