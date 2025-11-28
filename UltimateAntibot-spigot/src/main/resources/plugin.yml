@@ -4,6 +4,8 @@ main: me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot
 api-version: 1.21
 folia-supported: true
 authors: [ Kr1S_D ]
+soft-depend:
+  - PacketEvents
 description: Another antibot plugin!
 load: STARTUP
 commands:
