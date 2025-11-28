@@ -181,14 +181,30 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         Bukkit.getPluginManager().registerEvents(new PingListener(this), this);
         Bukkit.getPluginManager().registerEvents(new MainEventListener(this), this);
         Bukkit.getPluginManager().registerEvents(new CustomEventListener(this), this);
-        // PacketEvents initialization
-        try {
-            PacketEvents.getAPI().init();
-            // Register packet listener
-            PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
-            logHelper.info("PacketAntibotManager initialized (PacketEvents).");
-        } catch (Throwable t) {
-            logHelper.info("PacketEvents not available or failed to initialize: " + t.getMessage());
+        // PacketEvents initialization: attempt only if the PacketEvents plugin is enabled.
+        if (Bukkit.getPluginManager().isPluginEnabled("PacketEvents")) {
+            try {
+                PacketEvents.getAPI().init();
+                PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
+                logHelper.info("PacketAntibotManager initialized (PacketEvents).");
+            } catch (Throwable t) {
+                logHelper.info("PacketEvents not available or failed to initialize: " + t.getMessage());
+            }
+        } else {
+            // PacketEvents might load slightly later; retry once after 1 second.
+            Bukkit.getScheduler().runTaskLater(this, () -> {
+                if (!Bukkit.getPluginManager().isPluginEnabled("PacketEvents")) {
+                    logHelper.info("PacketEvents not present or not enabled; skipping PacketEvents integration.");
+                    return;
+                }
+                try {
+                    PacketEvents.getAPI().init();
+                    PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
+                    logHelper.info("PacketAntibotManager initialized on delayed attempt (PacketEvents).");
+                } catch (Throwable t) {
+                    logHelper.info("PacketEvents not available or failed to initialize on delayed attempt: " + t.getMessage());
+                }
+            }, 20L);
         }
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to load");
