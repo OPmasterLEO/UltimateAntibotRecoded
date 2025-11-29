@@ -1,34 +1,23 @@
 package me.kr1s_d.ultimateantibot;
 
-import com.github.retrooper.packetevents.PacketEvents;
-import com.github.retrooper.packetevents.event.PacketListenerAbstract;
-import com.github.retrooper.packetevents.event.PacketReceiveEvent;
-import com.github.retrooper.packetevents.event.UserDisconnectEvent;
-import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
-import com.github.retrooper.packetevents.protocol.player.User;
-import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClientLoginStart;
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientKeepAlive;
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage;
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientSettings;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerKeepAlive;
-import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.JavaPlugin;
-
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
-/**
- * Clean, single-class PacketAntibotManager implementing PacketListener.
- * Updated for broader PacketEvents 2.x API compatibility.
- */
-public class PacketAntibotManager extends PacketListenerAbstract {
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class PacketAntibotManager {
 
     private final JavaPlugin plugin;
+    private final ConnectionController controller;
 
     private final Map<String, Long> ipConnectionHistory = new ConcurrentHashMap<>();
     private final Map<String, Long> handshakeTimestamps = new ConcurrentHashMap<>();
@@ -43,10 +32,11 @@ public class PacketAntibotManager extends PacketListenerAbstract {
 
     private static final long CLEANUP_TIMER_TICKS = 20L * 10;
     private static final long KEEPALIVE_SEND_TICKS = 40L;
-    private static final long VERIFICATION_SWEEP_TICKS = 100L;
+    private static final long VERIFICATION_SWEEP_TICKS = 600L;
 
-    public PacketAntibotManager(JavaPlugin plugin) {
+    public PacketAntibotManager(JavaPlugin plugin, ConnectionController controller) {
         this.plugin = plugin;
+        this.controller = controller;
 
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::cleanupAndEvaluate, CLEANUP_TIMER_TICKS, CLEANUP_TIMER_TICKS);
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::sendKeepalivesToPending, 20L, KEEPALIVE_SEND_TICKS);
@@ -64,84 +54,71 @@ public class PacketAntibotManager extends PacketListenerAbstract {
             boolean shouldAggressive = recentHandshakes.size() > GLOBAL_RATE_THRESHOLD_PER_5S;
             if (shouldAggressive != aggressiveMode.get()) {
                 aggressiveMode.set(shouldAggressive);
-                plugin.getLogger().log(Level.INFO, "PacketAntibotManager: aggressiveMode=" + shouldAggressive + " (recentHandshakes=" + recentHandshakes.size() + ")");
+                plugin.getLogger().log(Level.INFO, "PacketAntibotManager: aggressiveMode={0} (recentHandshakes={1})", new Object[]{shouldAggressive, recentHandshakes.size()});
             }
         }
     }
 
-    @Override
-    public void onPacketReceive(PacketReceiveEvent event) {
-        try {
-            final User user = event.getUser();
-            if (user == null) return;
-            final InetSocketAddress address = user.getAddress();
-            if (address == null) return;
-
-            final String ip = address.getAddress().getHostAddress();
-            final long now = System.currentTimeMillis();
-
-            synchronized (recentHandshakes) { recentHandshakes.addLast(now); }
-
-            // Use PacketType constants for detection
-            PacketTypeCommon type = event.getPacketType();
-
-            if (type == PacketType.Handshaking.Client.HANDSHAKE) {
-                handleHandshake(user, ip, now);
-                return;
-            }
-
-            if (type == PacketType.Login.Client.LOGIN_START) {
-                WrapperLoginClientLoginStart login = new WrapperLoginClientLoginStart(event);
-                handleLoginStart(user, login, now);
-                return;
-            }
-
-            if (type == PacketType.Play.Client.CLIENT_SETTINGS) {
-                WrapperPlayClientSettings settings = new WrapperPlayClientSettings(event);
-                handleSettings(user, settings);
-                return;
-            }
-
-            if (type == PacketType.Play.Client.PLUGIN_MESSAGE) {
-                WrapperPlayClientPluginMessage msg = new WrapperPlayClientPluginMessage(event);
-                handlePluginMessage(user, msg);
-                return;
-            }
-
-            if (type == PacketType.Play.Client.KEEP_ALIVE) {
-                WrapperPlayClientKeepAlive ka = new WrapperPlayClientKeepAlive(event);
-                handleKeepAlive(user, ka);
-            }
-        } catch (Throwable ignored) {
-            // Ignored intentionally for safety
-        }
+    public void notifyPacketSeen(String connId) {
+        long now = System.currentTimeMillis();
+        synchronized (recentHandshakes) { recentHandshakes.addLast(now); }
     }
 
-    private void handleHandshake(User user, String ip, long now) {
+    public void notifyHandshake(String connId, InetSocketAddress address) {
+        String ip = address == null ? "unknown" : address.getAddress().getHostAddress();
+        long now = System.currentTimeMillis();
+        handleHandshake(connId, ip, now);
+    }
+
+    public void notifyLoginStart(String connId, String username) {
+        long now = System.currentTimeMillis();
+        handleLoginStart(connId, username, now);
+    }
+
+    public void notifyClientSettings(String connId) {
+        handleSettings(connId);
+    }
+
+    public void notifyPluginMessage(String connId, String channel) {
+        handlePluginMessage(connId, channel);
+    }
+
+    public void notifyClientKeepAlive(String connId) {
+        handleKeepAlive(connId);
+    }
+
+    private void handleHandshake(String connId, String ip, long now) {
         long throttle = aggressiveMode.get() ? 800L : BASE_CONNECTION_THROTTLE_MS;
         Long last = ipConnectionHistory.get(ip);
         if (last != null && now - last < throttle) {
-            if (!aggressiveMode.get()) {
-                try { user.closeConnection(); } catch (Throwable ignored) {}
-            } else {
-                pendingVerification.putIfAbsent(getConnectionId(user), new VerificationData());
+                pendingVerification.putIfAbsent(connId, new VerificationData());
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                    Long h = handshakeTimestamps.get(connId);
+                    VerificationData d = pendingVerification.get(connId);
+                    boolean handshakePassed = d != null && d.handshakePassed;
+                    if ((h == null || !handshakePassed) && !aggressiveMode.get()) {
+                        plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection after delayed throttle check conn={0} ip={1}", new Object[]{connId, ip});
+                        try { controller.closeConnection(connId); } catch (Throwable ignored) {}
+                        pendingVerification.remove(connId);
+                    }
+                });
+                return;
             }
-            return;
-        }
         ipConnectionHistory.put(ip, now);
-        handshakeTimestamps.put(getConnectionId(user), now);
-        pendingVerification.putIfAbsent(getConnectionId(user), new VerificationData());
+        handshakeTimestamps.put(connId, now);
+        pendingVerification.putIfAbsent(connId, new VerificationData());
     }
 
-    private void handleLoginStart(User user, WrapperLoginClientLoginStart login, long now) {
-        String connId = getConnectionId(user);
+    private void handleLoginStart(String connId, String username, long now) {
         Long handshake = handshakeTimestamps.get(connId);
         if (handshake == null) {
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                 try { Thread.sleep(250); } catch (InterruptedException ignored) {}
                 Long h = handshakeTimestamps.get(connId);
                 if (h == null && !aggressiveMode.get()) {
-                    try { user.closeConnection(); } catch (Throwable ignored) {}
+                    plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection (missing-handshake after delay) conn={0}", new Object[]{connId});
+                    try { controller.closeConnection(connId); } catch (Throwable ignored) {}
                 }
             });
             return;
@@ -150,16 +127,18 @@ public class PacketAntibotManager extends PacketListenerAbstract {
         long slowThreshold = aggressiveMode.get() ? BASE_SLOW_BOT_THRESHOLD_MS * 2 : BASE_SLOW_BOT_THRESHOLD_MS;
         if (delta > slowThreshold) {
             if (!aggressiveMode.get()) {
-                try { user.closeConnection(); } catch (Throwable ignored) {}
+                plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection (slow-handshake) conn={0} delta={1}", new Object[]{connId, delta});
+                try { controller.closeConnection(connId); } catch (Throwable ignored) {}
             } else {
                 pendingVerification.computeIfAbsent(connId, k -> new VerificationData()).markedSlow = true;
             }
             return;
         }
 
-        String name = login.getUsername();
+        String name = username;
         if (name == null || !name.matches("[a-zA-Z0-9_]{3,16}")) {
-            try { user.closeConnection(); } catch (Throwable ignored) {}
+            plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection (invalid-username) conn={0} name={1}", new Object[]{connId, name});
+            try { controller.closeConnection(connId); } catch (Throwable ignored) {}
             return;
         }
 
@@ -168,27 +147,25 @@ public class PacketAntibotManager extends PacketListenerAbstract {
         data.lastActivity = now;
     }
 
-    private void handleSettings(User user, WrapperPlayClientSettings settings) {
-        VerificationData data = pendingVerification.get(getConnectionId(user));
+    private void handleSettings(String connId) {
+        VerificationData data = pendingVerification.get(connId);
         if (data != null) {
             data.hasSentSettings = true;
             data.lastActivity = System.currentTimeMillis();
         }
     }
 
-    private void handlePluginMessage(User user, WrapperPlayClientPluginMessage msg) {
-        VerificationData data = pendingVerification.get(getConnectionId(user));
+    private void handlePluginMessage(String connId, String channel) {
+        VerificationData data = pendingVerification.get(connId);
         if (data == null) return;
-        String channel = msg.getChannelName();
-        if (channel == null) return;
         if (channel.equalsIgnoreCase("minecraft:brand") || channel.equalsIgnoreCase("MC|Brand")) {
             data.hasSentPluginMessage = true;
             data.lastActivity = System.currentTimeMillis();
         }
     }
 
-    private void handleKeepAlive(User user, WrapperPlayClientKeepAlive keepAlive) {
-        VerificationData data = pendingVerification.get(getConnectionId(user));
+    private void handleKeepAlive(String connId) {
+        VerificationData data = pendingVerification.get(connId);
         if (data == null) return;
         long now = System.currentTimeMillis();
         long sentAt = data.lastKeepAliveSentAt;
@@ -202,11 +179,8 @@ public class PacketAntibotManager extends PacketListenerAbstract {
         }
     }
 
-    @Override
-    public void onUserDisconnect(UserDisconnectEvent event) {
-        User user = event.getUser();
-        if (user == null) return;
-        String connId = getConnectionId(user);
+    public void notifyDisconnect(String connId) {
+        if (connId == null) return;
         handshakeTimestamps.remove(connId);
         pendingVerification.remove(connId);
     }
@@ -219,13 +193,18 @@ public class PacketAntibotManager extends PacketListenerAbstract {
             String connId = e.getKey();
             VerificationData data = e.getValue();
             if (data.verified) continue;
+            if (!data.handshakePassed) continue;
             if (System.currentTimeMillis() - data.lastKeepAliveSentAt < 1000L) continue;
-            User user = findUserByConnectionId(connId);
-            if (user == null) continue;
+            if (controller.getAddress(connId) == null) continue;
+            try {
+                if (!controller.hasPlayer(connId)) continue;
+            } catch (Throwable ignored) {
+                continue;
+            }
             long id = ThreadLocalRandom.current().nextLong();
             try {
-                WrapperPlayServerKeepAlive keepAlive = new WrapperPlayServerKeepAlive(id);
-                user.sendPacket(keepAlive);
+                boolean ok = controller.sendKeepAlive(connId, id);
+                if (!ok) continue;
             } catch (Throwable ignored) {}
             data.lastKeepAliveSentAt = System.currentTimeMillis();
             sends++;
@@ -243,13 +222,14 @@ public class PacketAntibotManager extends PacketListenerAbstract {
             synchronized (data.keepAliveSamples) { samples = new ArrayList<>(data.keepAliveSamples); }
             if (samples.size() >= 3) {
                 double variance = calculateVariance(samples);
-                User user = findUserByConnectionId(connId);
-                boolean isLocal = user != null && user.getAddress() != null && user.getAddress().getAddress().isLoopbackAddress();
-                if (!isLocal && variance < 0.5D && !aggressiveMode.get()) {
-                    if (user != null) try { user.closeConnection(); } catch (Throwable ignored) {}
-                    pendingVerification.remove(connId);
-                    continue;
-                }
+                InetSocketAddress addr1 = controller.getAddress(connId);
+                boolean isLocal = addr1 != null && addr1.getAddress().isLoopbackAddress();
+                    if (!isLocal && variance < 0.5D && !aggressiveMode.get() && !data.hasSentSettings && !data.hasSentPluginMessage) {
+                        plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection (keepalive-variance+no-settings) conn={0} variance={1}", new Object[]{connId, variance});
+                        try { controller.closeConnection(connId); } catch (Throwable ignored) {}
+                        pendingVerification.remove(connId);
+                        continue;
+                    }
                 if (data.hasSentSettings && (data.hasSentPluginMessage || samples.size() >= 3)) {
                     data.verified = true;
                     pendingVerification.remove(connId);
@@ -259,9 +239,14 @@ public class PacketAntibotManager extends PacketListenerAbstract {
 
             long ageMs = now - data.createdAt;
             if (ageMs >= VERIFICATION_SWEEP_TICKS * 50L) {
-                User user = findUserByConnectionId(connId);
-                if (!data.hasSentSettings && !aggressiveMode.get()) {
-                    if (user != null) try { user.closeConnection(); } catch (Throwable ignored) {}
+                boolean lowSamples = samples.size() < 3;
+                boolean shouldClose = !data.hasSentSettings && !data.hasSentPluginMessage && lowSamples && !aggressiveMode.get();
+                boolean handshakePassed = data.handshakePassed;
+                boolean hasPlayer = controller.hasPlayer(connId);
+
+                if (shouldClose && !handshakePassed && !hasPlayer) {
+                    plugin.getLogger().log(Level.INFO, "PacketAntibotManager: closing connection (verification-timeout-missing-settings) conn={0} ageMs={1}", new Object[]{connId, ageMs});
+                    try { controller.closeConnection(connId); } catch (Throwable ignored) {}
                     pendingVerification.remove(connId);
                 } else {
                     data.verified = true;
@@ -281,25 +266,7 @@ public class PacketAntibotManager extends PacketListenerAbstract {
         return sq / samples.size();
     }
 
-    private User findUserByConnectionId(String connId) {
-        try {
-            // Updated PacketEvents 2.x API call for users
-            Collection<User> users = PacketEvents.getAPI().getProtocolManager().getUsers();
-            
-            for (User u : users) {
-                if (getConnectionId(u).equals(connId)) return u;
-            }
-        } catch (Throwable ignored) {
-            // Fallback just in case
-        }
-        return null;
-    }
-
-    private String getConnectionId(User user) {
-        if (user == null || user.getAddress() == null) return "unknown";
-        InetSocketAddress a = user.getAddress();
-        return a.getAddress().getHostAddress() + ":" + a.getPort();
-    }
+    
 
     private static class VerificationData {
         final long createdAt = System.currentTimeMillis();
@@ -307,7 +274,9 @@ public class PacketAntibotManager extends PacketListenerAbstract {
         volatile boolean hasSentSettings = false;
         volatile boolean hasSentPluginMessage = false;
         volatile boolean verified = false;
+        @SuppressWarnings("unused")
         volatile boolean markedSlow = false;
+        @SuppressWarnings("unused")
         volatile long lastActivity = System.currentTimeMillis();
         volatile long lastKeepAliveSentAt = 0L;
         final List<Long> keepAliveSamples = new ArrayList<>();

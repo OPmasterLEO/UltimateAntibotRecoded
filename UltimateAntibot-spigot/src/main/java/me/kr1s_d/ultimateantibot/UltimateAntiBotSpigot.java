@@ -1,12 +1,18 @@
 package me.kr1s_d.ultimateantibot;
 
 import java.io.File;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitScheduler;
@@ -14,8 +20,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 import com.github.Anon8281.universalScheduler.UniversalScheduler;
 import com.github.Anon8281.universalScheduler.scheduling.schedulers.TaskScheduler;
-import com.github.retrooper.packetevents.PacketEvents;
 
+import io.netty.channel.Channel;
 import me.kr1s_d.commandframework.CommandManager;
 import me.kr1s_d.ultimateantibot.commands.AddRemoveBlacklistCommand;
 import me.kr1s_d.ultimateantibot.commands.AddRemoveWhitelistCommand;
@@ -56,6 +62,8 @@ import me.kr1s_d.ultimateantibot.common.utils.Updater;
 import me.kr1s_d.ultimateantibot.listener.CustomEventListener;
 import me.kr1s_d.ultimateantibot.listener.MainEventListener;
 import me.kr1s_d.ultimateantibot.listener.PingListener;
+import me.kr1s_d.ultimateantibot.netty.ChannelInjectorSpigot;
+import me.kr1s_d.ultimateantibot.netty.PacketInspectorHandler;
 import me.kr1s_d.ultimateantibot.objects.Config;
 import me.kr1s_d.ultimateantibot.objects.filter.Bukkit247Filter;
 import me.kr1s_d.ultimateantibot.objects.filter.BukkitAttackFilter;
@@ -84,12 +92,6 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     private SatelliteServer satellite;
     private boolean isRunning;
     private static TaskScheduler universalScheduler;
-
-    @Override
-    public void onLoad() {
-        PacketEvents.getAPI().load();
-    }
-
 
     @Override
     public void onEnable() {
@@ -177,35 +179,22 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         commandManager.register(new ConnectionProfileCommand(this));
         commandManager.setWrongArgumentMessage(MessageManager.commandWrongArgument);
         commandManager.setNoPlayerMessage("&fYou are not a &cplayer!");
-        //commandManager.register(new SatelliteCommand(this));
         Bukkit.getPluginManager().registerEvents(new PingListener(this), this);
         Bukkit.getPluginManager().registerEvents(new MainEventListener(this), this);
         Bukkit.getPluginManager().registerEvents(new CustomEventListener(this), this);
-        // PacketEvents initialization: attempt only if the PacketEvents plugin is enabled.
-        if (Bukkit.getPluginManager().isPluginEnabled("PacketEvents")) {
+        NettyConnectionController netController = new NettyConnectionController();
+        PacketAntibotManager packetManager = new PacketAntibotManager(this, netController);
+        for (org.bukkit.entity.Player p : Bukkit.getOnlinePlayers()) {
             try {
-                PacketEvents.getAPI().init();
-                PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
-                logHelper.info("PacketAntibotManager initialized (PacketEvents).");
-            } catch (Throwable t) {
-                logHelper.info("PacketEvents not available or failed to initialize: " + t.getMessage());
-            }
-        } else {
-            // PacketEvents might load slightly later; retry once after 1 second.
-            Bukkit.getScheduler().runTaskLater(this, () -> {
-                if (!Bukkit.getPluginManager().isPluginEnabled("PacketEvents")) {
-                    logHelper.info("PacketEvents not present or not enabled; skipping PacketEvents integration.");
-                    return;
-                }
-                try {
-                    PacketEvents.getAPI().init();
-                    PacketEvents.getAPI().getEventManager().registerListener(new PacketAntibotManager(this));
-                    logHelper.info("PacketAntibotManager initialized on delayed attempt (PacketEvents).");
-                } catch (Throwable t) {
-                    logHelper.info("PacketEvents not available or failed to initialize on delayed attempt: " + t.getMessage());
-                }
-            }, 20L);
+                ChannelInjectorSpigot.injectForPlayer(p, this, new PacketInspectorHandler(p, packetManager, netController));
+            } catch (Throwable ignored) {}
         }
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onJoin(PlayerJoinEvent e) {
+                ChannelInjectorSpigot.injectForPlayer(e.getPlayer(), UltimateAntiBotSpigot.this, new PacketInspectorHandler(e.getPlayer(), packetManager, netController));
+            }
+        }, this);
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to load");
         new Updater(this);
@@ -213,7 +202,6 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
 
     @Override
     public void onDisable() {
-        PacketEvents.getAPI().terminate();
         long a = System.currentTimeMillis();
         logHelper.info("&cUnloading...");
         this.isRunning = false;
@@ -228,6 +216,81 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         logHelper.info("&cThanks for choosing us!");
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to unload");
+    }
+
+    /**
+     * Simple `ConnectionController` implementation that maps connection ids to online players.
+     * This is intentionally minimal: Netty-backed controller can replace it for real packet sends.
+     */
+    private class SpigotConnectionController implements ConnectionController {
+        @Override
+        public List<String> listConnectionIds() {
+            List<String> ids = new ArrayList<>();
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                InetSocketAddress a = p.getAddress();
+                if (a == null) continue;
+                ids.add(a.getAddress().getHostAddress() + ":" + a.getPort());
+            }
+            return ids;
+        }
+
+        @Override
+        public InetSocketAddress getAddress(String connId) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                InetSocketAddress a = p.getAddress();
+                if (a == null) continue;
+                String id = a.getAddress().getHostAddress() + ":" + a.getPort();
+                if (id.equals(connId)) return a;
+            }
+            return null;
+        }
+
+        @Override
+        public boolean hasPlayer(String connId) {
+            return getAddress(connId) != null;
+        }
+
+        @Override
+        public boolean sendKeepAlive(String connId, long id) {
+            // Not implemented in this simple controller. Netty-backed controller should implement.
+            return false;
+        }
+
+        @Override
+        public void closeConnection(String connId) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                InetSocketAddress a = p.getAddress();
+                if (a == null) continue;
+                String id = a.getAddress().getHostAddress() + ":" + a.getPort();
+                if (id.equals(connId)) {
+                    try {
+                        p.kickPlayer(Utils.colora("&cConnection closed by UltimateAntiBot"));
+                    } catch (Throwable ignored) {}
+                    return;
+                }
+            }
+        }
+
+        @Override
+        public void registerChannel(Channel channel, Player player) {
+        }
+
+        @Override
+        public void unregisterChannel(Channel channel) {
+        }
+
+        @Override
+        public String getConnectionId(Channel channel) {
+            if (channel == null) return null;
+            try {
+                Object addr = channel.remoteAddress();
+                if (addr instanceof InetSocketAddress) {
+                    InetSocketAddress a = (InetSocketAddress) addr;
+                    return a.getAddress().getHostAddress() + ":" + a.getPort();
+                }
+            } catch (Throwable ignored) {}
+            return null;
+        }
     }
 
     private long msToTicks(long ms){
@@ -247,7 +310,7 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     @Override
     public void runTask(Runnable task, boolean isAsync) {
         if (universalScheduler != null) {
-            universalScheduler.runTask(task); // UniversalScheduler handles Folia-safe execution
+            universalScheduler.runTask(task);
             return;
         }
         if (isAsync) {

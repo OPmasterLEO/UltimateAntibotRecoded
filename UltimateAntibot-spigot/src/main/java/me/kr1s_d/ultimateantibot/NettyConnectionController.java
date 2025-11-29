@@ -1,0 +1,137 @@
+package me.kr1s_d.ultimateantibot;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import org.bukkit.entity.Player;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
+import io.netty.util.AttributeKey;
+
+public class NettyConnectionController implements ConnectionController {
+    private final ConcurrentHashMap<Channel, Player> channelToPlayer = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Channel> connIdToChannel = new ConcurrentHashMap<>();
+    private static final AttributeKey<String> CONNID_KEY = AttributeKey.valueOf("uab-connid");
+
+    @Override
+    public Collection<String> listConnectionIds() {
+        return connIdToChannel.keySet();
+    }
+
+    @Override
+    public InetSocketAddress getAddress(String connId) {
+        Channel ch = connIdToChannel.get(connId);
+        if (ch == null) return null;
+        Object addr = ch.remoteAddress();
+        if (addr instanceof InetSocketAddress) return (InetSocketAddress) addr;
+        return null;
+    }
+
+    @Override
+    public boolean hasPlayer(String connId) {
+        return connIdToChannel.containsKey(connId);
+    }
+
+    @Override
+    public boolean sendKeepAlive(String connId, long id) {
+        Channel ch = connIdToChannel.get(connId);
+        if (ch == null || !ch.isActive()) return false;
+
+        int packetId = 0x1F;
+
+        ByteBuf payload = ch.alloc().buffer();
+        writeVarInt(payload, packetId);
+        writeVarLong(payload, id);
+
+        int payloadLen = payload.readableBytes();
+        ByteBuf frame = ch.alloc().buffer();
+        writeVarInt(frame, payloadLen);
+        frame.writeBytes(payload);
+        try { payload.release(); } catch (Throwable ignored) {}
+
+        try {
+            ch.writeAndFlush(frame);
+            return true;
+        } catch (Throwable t) {
+            try { frame.release(); } catch (Throwable ignored) {}
+            return false;
+        }
+    }
+
+    @Override
+    public void closeConnection(String connId) {
+        Channel ch = connIdToChannel.remove(connId);
+        if (ch != null) {
+            channelToPlayer.remove(ch);
+            try { ch.attr(CONNID_KEY).set(null); } catch (Throwable ignored) {}
+            try { ch.close(); } catch (Throwable ignored) {}
+        }
+    }
+
+    @Override
+    public void registerChannel(Channel channel, Player player) {
+        if (channel == null) return;
+        channelToPlayer.put(channel, player);
+        Object addr = channel.remoteAddress();
+        if (addr instanceof InetSocketAddress) {
+            InetSocketAddress a = (InetSocketAddress) addr;
+            String id = a.getAddress().getHostAddress() + ":" + a.getPort();
+            connIdToChannel.put(id, channel);
+            try { channel.attr(CONNID_KEY).set(id); } catch (Throwable ignored) {}
+        }
+        // ensure we cleanup mappings if the channel closes unexpectedly
+        try {
+            channel.closeFuture().addListener(f -> {
+                try { unregisterChannel(channel); } catch (Throwable ignored) {}
+            });
+        } catch (Throwable ignored) {}
+        }
+    }
+
+    @Override
+    public void unregisterChannel(Channel channel) {
+        if (channel == null) return;
+        channelToPlayer.remove(channel);
+        try { channel.attr(CONNID_KEY).set(null); } catch (Throwable ignored) {}
+        List<String> toRemove = connIdToChannel.entrySet().stream().filter(en -> en.getValue().equals(channel)).map(en -> en.getKey()).collect(Collectors.toList());
+        for (String k : toRemove) connIdToChannel.remove(k);
+    }
+
+    @Override
+    public String getConnectionId(Channel channel) {
+        if (channel == null) return null;
+        try {
+            String id = channel.attr(CONNID_KEY).get();
+            if (id != null) return id;
+        } catch (Throwable ignored) {}
+        Object addr = channel.remoteAddress();
+        if (addr instanceof InetSocketAddress) {
+            InetSocketAddress a = (InetSocketAddress) addr;
+            String id = a.getAddress().getHostAddress() + ":" + a.getPort();
+            try { channel.attr(CONNID_KEY).set(id); } catch (Throwable ignored) {}
+            connIdToChannel.put(id, channel);
+            return id;
+        }
+        return null;
+    }
+
+    private static void writeVarInt(ByteBuf buf, int value) {
+        while ((value & 0xFFFFFF80) != 0L) {
+            buf.writeByte((value & 0x7F) | 0x80);
+            value >>>= 7;
+        }
+        buf.writeByte(value & 0x7F);
+    }
+
+    private static void writeVarLong(ByteBuf buf, long value) {
+        while ((value & 0xFFFFFFFFFFFFFF80L) != 0L) {
+            buf.writeByte(((int) value & 0x7F) | 0x80);
+            value >>>= 7;
+        }
+        buf.writeByte((int) value & 0x7F);
+    }
+}
