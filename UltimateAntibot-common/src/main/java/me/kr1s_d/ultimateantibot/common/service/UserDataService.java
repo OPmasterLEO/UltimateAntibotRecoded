@@ -3,8 +3,8 @@ package me.kr1s_d.ultimateantibot.common.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -27,14 +27,14 @@ public class UserDataService implements IService {
     private final IAntiBotPlugin plugin;
     private final LogHelper logHelper;
     private Cache<String, ConnectionProfile> profiles;
-    private List<ConnectionProfile> onlineProfiles;
+    private final List<ConnectionProfile> onlineProfiles;
 
     public UserDataService(IAntiBotPlugin plugin) {
         this.plugin = plugin;
         this.logHelper = plugin.getLogHelper();
         this.profiles = Caffeine.newBuilder()
-                .build();
-        this.onlineProfiles = new ArrayList<>();
+            .build();
+        this.onlineProfiles = new CopyOnWriteArrayList<>();
     }
 
     @Override
@@ -42,9 +42,7 @@ public class UserDataService implements IService {
         try {
             String encodedConnections = FileUtil.getEncodedBase64("profiles.dat", FileUtil.UABFolder.DATA);
             if (encodedConnections != null) {
-                //load saved data as list
                 List<ConnectionProfile> serialized = SerializeUtil.deserialize(encodedConnections, ArrayList.class);
-                //put inside cache
                 if (serialized != null) {
                     for (ConnectionProfile profile : serialized) {
                         if(profile == null || profile.isNull()) continue;
@@ -53,7 +51,6 @@ public class UserDataService implements IService {
                 }
             }
 
-            //remove olds
             int count = 0;
             for (Map.Entry<String, ConnectionProfile> map : profiles.asMap().entrySet()) {
                 if(map.getValue().getDaysFromLastJoin() >= 30) {
@@ -73,14 +70,11 @@ public class UserDataService implements IService {
 
     @Override
     public void unload() {
-        //convert cache to a list of connectionprofile
         List<ConnectionProfile> profiles = new ArrayList<>();
-        //fill list with current data
         this.profiles.asMap().forEach((key, value) -> {
             value.checkMetadata();
             profiles.add(value);
         });
-        //serialize
         FileUtil.writeBase64("profiles.dat", FileUtil.UABFolder.DATA, profiles);
     }
 
@@ -111,7 +105,6 @@ public class UserDataService implements IService {
         ConnectionProfile profile = getProfile(ip);
         if(profile == null) return true;
         if(profile.isFirstJoin()) {
-            //while listening for first join start checking for connection analyze
             profile.process(ScoreTracker.ScoreID.IS_FIST_JOIN, true);
             profile.setFirstJoin(false);
             return true;
@@ -134,10 +127,17 @@ public class UserDataService implements IService {
             return;
         }
 
-        List<ConnectionProfile> bots = getConnectedProfilesByScore(ConfigManger.connectionAnalyzeBlacklistFrom);
-        if(bots.size() >= ConfigManger.connectionAnalyzeBlacklistTrigger) {
-            disconnectProfiles(ConfigManger.connectionAnalyzeBlacklistFrom, true);
-            plugin.getAntiBotManager().enableSlowAntiBotMode();
+        int need = ConfigManger.connectionAnalyzeBlacklistTrigger;
+        int ordinal = ConfigManger.connectionAnalyzeBlacklistFrom.ordinal();
+        int cnt = 0;
+        for (ConnectionProfile p : onlineProfiles) {
+            if (p.getConnectionScore().ordinal() >= ordinal) {
+                if (++cnt >= need) {
+                    disconnectProfiles(ConfigManger.connectionAnalyzeBlacklistFrom, true);
+                    plugin.getAntiBotManager().enableSlowAntiBotMode();
+                    return;
+                }
+            }
         }
     }
 
@@ -148,19 +148,23 @@ public class UserDataService implements IService {
     @UnderAttackMethod
     public List<ConnectionProfile> getConnectedProfilesByScore(ConnectionProfile.ConnectionScore score) {
         int ordinal = score.ordinal();
-        return getConnectedProfiles().stream()
-                .filter(s -> s.getConnectionScore().ordinal() >= ordinal)
-                .collect(Collectors.toList());
+        List<ConnectionProfile> result = new ArrayList<>();
+        for (ConnectionProfile p : onlineProfiles) {
+            if (p.getConnectionScore().ordinal() >= ordinal) result.add(p);
+        }
+        return result;
     }
 
     @UnderAttackMethod
     public void disconnectProfiles(ConnectionProfile.ConnectionScore score, boolean blacklist) {
-        for (ConnectionProfile profile : getConnectedProfilesByScore(score)) {
-            profile.setFirstJoin(true); //reset first join check
-            plugin.disconnect(profile.getIP(), MessageManager.getSafeModeMessage());
-
-            if(blacklist) {
-                plugin.getAntiBotManager().getBlackListService().blacklist(profile.getIP(), BlackListReason.STRANGE_PLAYER_CONNECTION, profile.getCurrentNickName());
+        int ordinal = score.ordinal();
+        for (ConnectionProfile profile : onlineProfiles) {
+            if (profile.getConnectionScore().ordinal() >= ordinal) {
+                profile.setFirstJoin(true);
+                plugin.disconnect(profile.getIP(), MessageManager.getSafeModeMessage());
+                if (blacklist) {
+                    plugin.getAntiBotManager().getBlackListService().blacklist(profile.getIP(), BlackListReason.STRANGE_PLAYER_CONNECTION, profile.getCurrentNickName());
+                }
             }
         }
     }
@@ -173,9 +177,12 @@ public class UserDataService implements IService {
 
     @UnderAttackMethod
     public List<ConnectionProfile> getLastJoinedAndConnectedProfiles(int minutes) {
-        return getConnectedProfiles().stream()
-                .filter(s -> s.getSecondsFromLastJoin() <= TimeUnit.MINUTES.toSeconds(minutes))
-                .collect(Collectors.toList());
+        long limit = TimeUnit.MINUTES.toSeconds(minutes);
+        List<ConnectionProfile> result = new ArrayList<>();
+        for (ConnectionProfile p : onlineProfiles) {
+            if (p.getSecondsFromLastJoin() <= limit) result.add(p);
+        }
+        return result;
     }
 
     @UnderAttackMethod

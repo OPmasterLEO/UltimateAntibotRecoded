@@ -42,22 +42,43 @@ public class NettyConnectionController implements ConnectionController {
     @Override
     public boolean sendKeepAlive(String connId, long id) {
         Channel ch = connIdToChannel.get(connId);
-        if (ch == null || !ch.isActive()) return false;
+        if (ch == null) return false;
+        if (!ch.isActive() || !ch.isOpen()) return false;
 
-        int packetId = 0x1F;
-
-        ByteBuf payload = ch.alloc().buffer();
-        writeVarInt(payload, packetId);
-        writeVarLong(payload, id);
-
-        int payloadLen = payload.readableBytes();
-        ByteBuf frame = ch.alloc().buffer();
-        writeVarInt(frame, payloadLen);
-        frame.writeBytes(payload);
-        try { payload.release(); } catch (Throwable ignored) {}
+        final ByteBuf frame = ch.alloc().buffer();
+        try {
+            int packetId = 0x1F;
+            ByteBuf payload = ch.alloc().buffer();
+            try {
+                writeVarInt(payload, packetId);
+                writeVarLong(payload, id);
+                int payloadLen = payload.readableBytes();
+                writeVarInt(frame, payloadLen);
+                frame.writeBytes(payload, payload.readerIndex(), payloadLen);
+            } finally {
+                try { payload.release(); } catch (Throwable ignored) {}
+            }
+        } catch (Throwable t) {
+            try { frame.release(); } catch (Throwable ignored) {}
+            return false;
+        }
 
         try {
-            ch.writeAndFlush(frame);
+            ch.eventLoop().execute(() -> {
+                try {
+                    ch.writeAndFlush(frame).addListener(future -> {
+                        if (!future.isSuccess()) {
+                            try { future.cause(); } catch (Throwable ignored) {}
+                            try { unregisterChannel(ch); } catch (Throwable ignored) {}
+                            try { ch.close(); } catch (Throwable ignored) {}
+                        }
+                    });
+                } catch (Throwable t) {
+                    try { frame.release(); } catch (Throwable ignored) {}
+                    try { unregisterChannel(ch); } catch (Throwable ignored) {}
+                    try { ch.close(); } catch (Throwable ignored) {}
+                }
+            });
             return true;
         } catch (Throwable t) {
             try { frame.release(); } catch (Throwable ignored) {}

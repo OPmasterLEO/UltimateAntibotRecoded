@@ -1,13 +1,12 @@
 package me.kr1s_d.ultimateantibot.common.helper;
 
 import me.kr1s_d.ultimateantibot.common.IServerPlatform;
+import static me.kr1s_d.ultimateantibot.common.helper.LogHelper.LogType.ERROR;
+import static me.kr1s_d.ultimateantibot.common.helper.LogHelper.LogType.INFO;
+import static me.kr1s_d.ultimateantibot.common.helper.LogHelper.LogType.WARNING;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
-
-import javax.print.DocFlavor;
-
-import static me.kr1s_d.ultimateantibot.common.helper.LogHelper.LogType.*;
 
 public class LogHelper {
     private final IServerPlatform platform;
