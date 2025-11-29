@@ -8,96 +8,136 @@ import org.bukkit.entity.Player;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.AttributeKey;
 import me.kr1s_d.ultimateantibot.ConnectionController;
 import me.kr1s_d.ultimateantibot.PacketAntibotManager;
 
+@ChannelHandler.Sharable
 public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
-    private final Player player;
     private final PacketAntibotManager manager;
     private final ConnectionController controller;
-    private static final AttributeKey<TokenBucket> TB_KEY = AttributeKey.valueOf("uab-tokenbucket");
+    public static final AttributeKey<TokenBucket> TB_KEY = AttributeKey.valueOf("uab-tokenbucket");
+    public static final AttributeKey<Player> PLAYER_KEY = AttributeKey.valueOf("uab-player");
+    public static final AttributeKey<String> PLAYER_NAME_KEY = AttributeKey.valueOf("uab-player-name");
+    public static final AttributeKey<java.util.concurrent.atomic.AtomicInteger> PACKET_COUNTER_KEY = AttributeKey.valueOf("uab-packet-counter");
+    private final java.util.concurrent.ExecutorService notifierExecutor;
+    private static final int PACKET_NOTIFY_THRESHOLD = 4;
 
-    public PacketInspectorHandler(Player player, PacketAntibotManager manager, ConnectionController controller) {
-        this.player = player;
+    public PacketInspectorHandler(PacketAntibotManager manager, ConnectionController controller) {
+        this(manager, controller, null);
+    }
+
+    public PacketInspectorHandler(PacketAntibotManager manager, ConnectionController controller, java.util.concurrent.ExecutorService notifierExecutor) {
         this.manager = manager;
         this.controller = controller;
+        this.notifierExecutor = notifierExecutor;
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         super.handlerAdded(ctx);
         Channel ch = ctx.channel();
-        try {
-            controller.registerChannel(ch, player);
-            try {
-                TokenBucket tb = ch.attr(TB_KEY).get();
-                if (tb == null) {
-                    tb = new TokenBucket(20, 1000);
-                    ch.attr(TB_KEY).set(tb);
+        controller.registerChannel(ch, ch.attr(PLAYER_KEY).get());
+        Object ra = ch.remoteAddress();
+        if (ra instanceof InetSocketAddress) {
+            InetSocketAddress addr = (InetSocketAddress) ra;
+            final String connId = controller.getConnectionId(ch);
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        manager.notifyHandshake(connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort()), addr);
+                    } catch (Throwable ignored) {}
                 }
-            } catch (Throwable ignored) {}
-            Object ra = ch.remoteAddress();
-            if (ra instanceof InetSocketAddress) {
-                InetSocketAddress addr = (InetSocketAddress) ra;
-                String connId = controller.getConnectionId(ch);
-                manager.notifyHandshake(connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort()), addr);
-            }
-        } catch (Throwable ignored) {}
+            };
+            if (notifierExecutor != null) notifierExecutor.execute(r); else r.run();
+        }
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         Channel ch = ctx.channel();
-        try {
-            Object ra = ch.remoteAddress();
-            if (ra instanceof InetSocketAddress) {
-                InetSocketAddress addr = (InetSocketAddress) ra;
-                String connId = controller.getConnectionId(ch);
-                manager.notifyDisconnect(connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort()));
-            }
-            controller.unregisterChannel(ch);
-            try { ch.attr(TB_KEY).set(null); } catch (Throwable ignored) {}
-        } catch (Throwable ignored) {}
+        Object ra = ch.remoteAddress();
+        if (ra instanceof InetSocketAddress) {
+            InetSocketAddress addr = (InetSocketAddress) ra;
+            final String connId = controller.getConnectionId(ch);
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        manager.notifyDisconnect(connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort()));
+                    } catch (Throwable ignored) {}
+                }
+            };
+            if (notifierExecutor != null) notifierExecutor.execute(r); else r.run();
+        }
+        controller.unregisterChannel(ch);
+        try { ch.attr(TB_KEY).set(null); } catch (Throwable ignored) {}
+        try { ch.attr(PACKET_COUNTER_KEY).set(null); } catch (Throwable ignored) {}
         super.handlerRemoved(ctx);
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (!(msg instanceof MinecraftPacket)) {
+            super.channelRead(ctx, msg);
+            return;
+        }
+
+        MinecraftPacket p = (MinecraftPacket) msg;
+        int id = p.getPacketId();
+        java.util.logging.Logger log = Bukkit.getLogger();
+        Channel ch = ctx.channel();
+        String playerName = null;
+        try { playerName = ch.attr(PLAYER_NAME_KEY).get(); } catch (Throwable ignored) {}
+        if (playerName == null) playerName = "?";
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "NettyPacket player=" + playerName + " id=" + id);
+        }
+
+        final String connId = controller.getConnectionId(ch);
+        if (connId == null) {
+            super.channelRead(ctx, msg);
+            return;
+        }
+
+        TokenBucket tb = null;
+        try { tb = ch.attr(TB_KEY).get(); } catch (Throwable ignored) {}
+        boolean allowed = tb == null ? true : tb.tryConsume();
+        if (allowed) {
+            java.util.concurrent.atomic.AtomicInteger counter = null;
+            try { counter = ch.attr(PACKET_COUNTER_KEY).get(); } catch (Throwable ignored) {}
+            if (counter == null) {
+                submitNotify(new Runnable() { public void run() { try { manager.notifyPacketSeen(connId); } catch (Throwable ignored) {} } });
+            } else {
+                int v = counter.incrementAndGet();
+                if ((v % PACKET_NOTIFY_THRESHOLD) == 0) {
+                    submitNotify(new Runnable() { public void run() { try { manager.notifyPacketSeen(connId); } catch (Throwable ignored) {} } });
+                }
+            }
+        }
+
+        ByteBuf payload = p.getPayload();
         try {
-            if (msg instanceof MinecraftPacket) {
-                MinecraftPacket p = (MinecraftPacket) msg;
-                int id = p.getPacketId();
-                java.util.logging.Logger log = Bukkit.getLogger();
-                if (log.isLoggable(Level.FINER)) {
-                    log.log(Level.FINER, "NettyPacket player=" + player.getName() + " id=" + id);
-                }
-
-                Channel ch = ctx.channel();
-                String connId = controller.getConnectionId(ch);
-
-                if (connId != null) {
-                    TokenBucket tb = null;
-                    try { tb = ch.attr(TB_KEY).get(); } catch (Throwable ignored) {}
-                    boolean allowed = tb == null ? true : tb.tryConsume();
-                    if (allowed) manager.notifyPacketSeen(connId);
-
-                    ByteBuf payload = p.getPayload();
-                    try {
-                        int readable = payload.readableBytes();
-                        if (readable >= 1 && readable <= 10) {
-                            if (allowed) manager.notifyClientKeepAlive(connId);
-                        }
-                    } finally {
-                        try { payload.release(); } catch (Throwable ignored) {}
-                    }
-                }
-                return;
+            int readable = payload.readableBytes();
+            if (readable >= 1 && readable <= 10) {
+                if (allowed) submitNotify(new Runnable() { public void run() { try { manager.notifyClientKeepAlive(connId); } catch (Throwable ignored) {} } });
             }
         } finally {
-            super.channelRead(ctx, msg);
+            try { payload.release(); } catch (Throwable ignored) {}
+        }
+
+        super.channelRead(ctx, msg);
+    }
+
+    private void submitNotify(Runnable r) {
+        if (notifierExecutor != null) {
+            try { notifierExecutor.execute(r); } catch (Throwable t) { /* drop on executor saturation */ }
+        } else {
+            r.run();
         }
     }
 }

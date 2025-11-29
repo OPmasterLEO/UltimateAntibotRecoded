@@ -1,17 +1,18 @@
 package me.kr1s_d.ultimateantibot.netty;
 
-import io.netty.channel.Channel;
+import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+
 import org.bukkit.entity.Player;
 
-import java.lang.reflect.Field;
-import java.util.logging.Level;
+import io.netty.channel.Channel;
 
 public final class ChannelInjectorSpigot {
     private ChannelInjectorSpigot() {}
 
     public static void injectForPlayer(Player player, Object plugin, PacketInspectorHandler handler) {
         try {
-            // Try to get the player connection via CraftPlayer.getHandle().playerConnection.networkManager.channel
             Object craftPlayer = player.getClass().getMethod("getHandle").invoke(player);
             Field pcField = null;
             for (Field f : craftPlayer.getClass().getDeclaredFields()) {
@@ -53,6 +54,19 @@ public final class ChannelInjectorSpigot {
             if (ch.pipeline().get("uab-inspector") == null) {
                 ch.pipeline().addLast("uab-inspector", handler);
             }
+
+            try {
+                ch.attr(PacketInspectorHandler.PLAYER_KEY).set(player);
+            } catch (Throwable ignored) {}
+            try {
+                ch.attr(PacketInspectorHandler.PLAYER_NAME_KEY).set(player.getName());
+            } catch (Throwable ignored) {}
+            try {
+                ch.attr(PacketInspectorHandler.TB_KEY).set(new TokenBucket(20, 1000));
+            } catch (Throwable ignored) {}
+            try {
+                ch.attr(PacketInspectorHandler.PACKET_COUNTER_KEY).set(new AtomicInteger(0));
+            } catch (Throwable ignored) {}
         } catch (Throwable t) {
             java.util.logging.Logger.getLogger("UltimateAntiBot").log(Level.FINER, "Channel injector failed for " + player.getName() + ": " + t.getMessage());
         }

@@ -4,6 +4,10 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -88,6 +92,7 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     private AttackTrackerService attackTrackerService;
     private VPNService VPNService;
     private Notificator notificator;
+    private ThreadPoolExecutor notifierExecutor;
     private UltimateAntiBotCore core;
     private SatelliteServer satellite;
     private boolean isRunning;
@@ -184,15 +189,34 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         Bukkit.getPluginManager().registerEvents(new CustomEventListener(this), this);
         NettyConnectionController netController = new NettyConnectionController();
         PacketAntibotManager packetManager = new PacketAntibotManager(this, netController);
+        ThreadPoolExecutor notifierExecutor = new ThreadPoolExecutor(
+                1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1024),
+                new ThreadFactory() {
+                    private final java.util.concurrent.atomic.AtomicInteger idx = new java.util.concurrent.atomic.AtomicInteger(0);
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread t = new Thread(r, "uab-notifier-" + idx.getAndIncrement());
+                        t.setDaemon(true);
+                        return t;
+                    }
+                },
+                new ThreadPoolExecutor.DiscardPolicy());
+
+        PacketInspectorHandler sharedHandler = new PacketInspectorHandler(packetManager, netController, notifierExecutor);
+        this.notifierExecutor = notifierExecutor;
         for (org.bukkit.entity.Player p : Bukkit.getOnlinePlayers()) {
             try {
-                ChannelInjectorSpigot.injectForPlayer(p, this, new PacketInspectorHandler(p, packetManager, netController));
+                ChannelInjectorSpigot.injectForPlayer(p, this, sharedHandler);
             } catch (Throwable ignored) {}
         }
         Bukkit.getPluginManager().registerEvents(new Listener() {
             @EventHandler
             public void onJoin(PlayerJoinEvent e) {
-                ChannelInjectorSpigot.injectForPlayer(e.getPlayer(), UltimateAntiBotSpigot.this, new PacketInspectorHandler(e.getPlayer(), packetManager, netController));
+                try {
+                    ChannelInjectorSpigot.injectForPlayer(e.getPlayer(), UltimateAntiBotSpigot.this, sharedHandler);
+                } catch (Throwable ignored) {}
             }
         }, this);
         long b = System.currentTimeMillis() - a;
@@ -205,6 +229,8 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         long a = System.currentTimeMillis();
         logHelper.info("&cUnloading...");
         this.isRunning = false;
+        try {
+        } catch (Throwable ignored) {}
         if(attackTrackerService != null) attackTrackerService.unload();
         if(firewallService != null) firewallService.shutDownFirewall();
         if(userDataService != null) userDataService.unload();
@@ -213,15 +239,16 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
             antiBotManager.getBlackListService().unload();
             antiBotManager.getWhitelistService().unload();
         }
+        if (this.notifierExecutor != null) {
+            try {
+                this.notifierExecutor.shutdownNow();
+            } catch (Throwable ignored) {}
+        }
         logHelper.info("&cThanks for choosing us!");
         long b = System.currentTimeMillis() - a;
         logHelper.info("&7Took &c" + b + "ms&7 to unload");
     }
 
-    /**
-     * Simple `ConnectionController` implementation that maps connection ids to online players.
-     * This is intentionally minimal: Netty-backed controller can replace it for real packet sends.
-     */
     private class SpigotConnectionController implements ConnectionController {
         @Override
         public List<String> listConnectionIds() {
@@ -252,7 +279,6 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
 
         @Override
         public boolean sendKeepAlive(String connId, long id) {
-            // Not implemented in this simple controller. Netty-backed controller should implement.
             return false;
         }
 

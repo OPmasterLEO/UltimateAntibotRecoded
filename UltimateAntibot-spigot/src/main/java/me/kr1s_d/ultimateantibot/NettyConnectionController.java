@@ -11,11 +11,14 @@ import org.bukkit.entity.Player;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
+import me.kr1s_d.ultimateantibot.netty.TokenBucket;
 
 public class NettyConnectionController implements ConnectionController {
     private final ConcurrentHashMap<Channel, Player> channelToPlayer = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Channel> connIdToChannel = new ConcurrentHashMap<>();
     private static final AttributeKey<String> CONNID_KEY = AttributeKey.valueOf("uab-connid");
+    private static final AttributeKey<Player> PLAYER_KEY = AttributeKey.valueOf("uab-player");
+    private static final AttributeKey<TokenBucket> TB_KEY = AttributeKey.valueOf("uab-tokenbucket");
 
     @Override
     public Collection<String> listConnectionIds() {
@@ -82,14 +85,14 @@ public class NettyConnectionController implements ConnectionController {
             String id = a.getAddress().getHostAddress() + ":" + a.getPort();
             connIdToChannel.put(id, channel);
             try { channel.attr(CONNID_KEY).set(id); } catch (Throwable ignored) {}
+            try { channel.attr(PLAYER_KEY).set(player); } catch (Throwable ignored) {}
+            try { channel.attr(TB_KEY).set(new TokenBucket(20, 1000)); } catch (Throwable ignored) {}
         }
-        // ensure we cleanup mappings if the channel closes unexpectedly
         try {
             channel.closeFuture().addListener(f -> {
                 try { unregisterChannel(channel); } catch (Throwable ignored) {}
             });
         } catch (Throwable ignored) {}
-        }
     }
 
     @Override
