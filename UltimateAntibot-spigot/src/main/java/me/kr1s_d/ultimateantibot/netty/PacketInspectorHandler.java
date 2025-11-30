@@ -23,17 +23,23 @@ public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
     public static final AttributeKey<Player> PLAYER_KEY = AttributeKey.valueOf("uab-player");
     public static final AttributeKey<String> PLAYER_NAME_KEY = AttributeKey.valueOf("uab-player-name");
     public static final AttributeKey<java.util.concurrent.atomic.AtomicInteger> PACKET_COUNTER_KEY = AttributeKey.valueOf("uab-packet-counter");
+    private final NotificationAggregator aggregator;
     private final java.util.concurrent.ExecutorService notifierExecutor;
     private static final int PACKET_NOTIFY_THRESHOLD = 4;
 
     public PacketInspectorHandler(PacketAntibotManager manager, ConnectionController controller) {
-        this(manager, controller, null);
+        this(manager, controller, null, null);
     }
 
     public PacketInspectorHandler(PacketAntibotManager manager, ConnectionController controller, java.util.concurrent.ExecutorService notifierExecutor) {
+        this(manager, controller, notifierExecutor, null);
+    }
+
+    public PacketInspectorHandler(PacketAntibotManager manager, ConnectionController controller, java.util.concurrent.ExecutorService notifierExecutor, NotificationAggregator aggregator) {
         this.manager = manager;
         this.controller = controller;
         this.notifierExecutor = notifierExecutor;
+        this.aggregator = aggregator;
     }
 
     @Override
@@ -53,7 +59,13 @@ public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
                     } catch (Throwable ignored) {}
                 }
             };
-            if (notifierExecutor != null) notifierExecutor.execute(r); else r.run();
+            if (aggregator != null) {
+                final String idForNotify = connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort());
+                try { manager.notifyHandshake(idForNotify, addr); } catch (Throwable ignored) {}
+            } else {
+                final String idForNotify = connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort());
+                try { manager.notifyHandshake(idForNotify, addr); } catch (Throwable ignored) {}
+            }
         }
     }
 
@@ -72,7 +84,7 @@ public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
                     } catch (Throwable ignored) {}
                 }
             };
-            if (notifierExecutor != null) notifierExecutor.execute(r); else r.run();
+            try { manager.notifyDisconnect(connId != null ? connId : (addr.getAddress().getHostAddress() + ":" + addr.getPort())); } catch (Throwable ignored) {}
         }
         controller.unregisterChannel(ch);
         try { ch.attr(TB_KEY).set(null); } catch (Throwable ignored) {}
@@ -111,11 +123,11 @@ public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
             java.util.concurrent.atomic.AtomicInteger counter = null;
             try { counter = ch.attr(PACKET_COUNTER_KEY).get(); } catch (Throwable ignored) {}
             if (counter == null) {
-                submitNotify(new Runnable() { public void run() { try { manager.notifyPacketSeen(connId); } catch (Throwable ignored) {} } });
+                if (aggregator != null) aggregator.submitPacketSeen(connId); else submitNotify(() -> { try { manager.notifyPacketSeen(connId);} catch(Throwable ignored){} });
             } else {
                 int v = counter.incrementAndGet();
                 if ((v % PACKET_NOTIFY_THRESHOLD) == 0) {
-                    submitNotify(new Runnable() { public void run() { try { manager.notifyPacketSeen(connId); } catch (Throwable ignored) {} } });
+                    if (aggregator != null) aggregator.submitPacketSeen(connId); else submitNotify(() -> { try { manager.notifyPacketSeen(connId);} catch(Throwable ignored){} });
                 }
             }
         }
@@ -124,7 +136,9 @@ public class PacketInspectorHandler extends ChannelInboundHandlerAdapter {
         try {
             int readable = payload.readableBytes();
             if (readable >= 1 && readable <= 10) {
-                if (allowed) submitNotify(new Runnable() { public void run() { try { manager.notifyClientKeepAlive(connId); } catch (Throwable ignored) {} } });
+                if (allowed) {
+                    if (aggregator != null) aggregator.submitClientKeepAlive(connId); else submitNotify(() -> { try { manager.notifyClientKeepAlive(connId);} catch (Throwable ignored){} });
+                }
             }
         } finally {
             try { payload.release(); } catch (Throwable ignored) {}

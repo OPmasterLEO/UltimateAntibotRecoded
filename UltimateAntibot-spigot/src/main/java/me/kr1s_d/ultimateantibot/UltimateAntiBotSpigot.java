@@ -67,6 +67,7 @@ import me.kr1s_d.ultimateantibot.listener.CustomEventListener;
 import me.kr1s_d.ultimateantibot.listener.MainEventListener;
 import me.kr1s_d.ultimateantibot.listener.PingListener;
 import me.kr1s_d.ultimateantibot.netty.ChannelInjectorSpigot;
+import me.kr1s_d.ultimateantibot.netty.NotificationAggregator;
 import me.kr1s_d.ultimateantibot.netty.PacketInspectorHandler;
 import me.kr1s_d.ultimateantibot.objects.Config;
 import me.kr1s_d.ultimateantibot.objects.filter.Bukkit247Filter;
@@ -204,8 +205,17 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
                 },
                 new ThreadPoolExecutor.DiscardPolicy());
 
-        PacketInspectorHandler sharedHandler = new PacketInspectorHandler(packetManager, netController, notifierExecutor);
+        NotificationAggregator aggregator = new NotificationAggregator(packetManager);
+        PacketInspectorHandler sharedHandler = new PacketInspectorHandler(packetManager, netController, notifierExecutor, aggregator);
         this.notifierExecutor = notifierExecutor;
+
+        long flushTicks = msToTicks(100L);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                try { aggregator.flush(); } catch (Throwable ignored) {}
+            }
+        }.runTaskTimerAsynchronously(this, flushTicks, flushTicks);
         for (org.bukkit.entity.Player p : Bukkit.getOnlinePlayers()) {
             try {
                 ChannelInjectorSpigot.injectForPlayer(p, this, sharedHandler);
