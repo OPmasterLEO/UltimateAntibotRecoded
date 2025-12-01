@@ -1,19 +1,28 @@
 package me.kr1s_d.ultimateantibot.commands;
 
-import me.kr1s_d.commandframework.objects.SubCommand;
-import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
-import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
-import me.kr1s_d.ultimateantibot.utils.Utils;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 
-import java.util.*;
+import me.kr1s_d.commandframework.objects.SubCommand;
+import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile;
+import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
+import me.kr1s_d.ultimateantibot.common.utils.StringUtil;
+import me.kr1s_d.ultimateantibot.utils.Utils;
 
 public class AddRemoveWhitelistCommand implements SubCommand {
+    private final IAntiBotPlugin plugin;
     private final IAntiBotManager iAntiBotManager;
 
     public AddRemoveWhitelistCommand(IAntiBotPlugin iAntiBotPlugin){
+        this.plugin = iAntiBotPlugin;
         this.iAntiBotManager = iAntiBotPlugin.getAntiBotManager();
     }
 
@@ -24,18 +33,68 @@ public class AddRemoveWhitelistCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        if (args[1].equalsIgnoreCase("add")) {
-            iAntiBotManager.getWhitelistService().whitelist("/" + args[2]);
-            iAntiBotManager.getBlackListService().unBlacklist("/" + args[2]);
-            sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.getCommandAdded(args[2], "whitelist")));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7PS: The IP has been removed from the blacklist as it has been whitelisted however remember that if a check blacklists it when you try to log in it will still be blacklisted!"));
+        final String input = args[2];
+        String resolvedIP = null;
+        String resolutionMethod = null;
+        List<String> affectedAccounts = new java.util.ArrayList<>();
+        if (StringUtil.isValidIPv4(input)) {
+            resolvedIP = input.replace("/", "");
+            resolutionMethod = "direct IP";
         } else {
-            if (args[1].equalsIgnoreCase("remove")) {
-                iAntiBotManager.getWhitelistService().unWhitelist("/" + args[2]);
-                sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.getCommandRemove(args[2], "whitelist")));
-            } else {
-                sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.commandWrongArgument));
+            final String usernameLower = input.toLowerCase();
+            org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
+            if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
+                resolvedIP = onlinePlayer.getAddress().getAddress().getHostAddress();
+                resolutionMethod = "online player";
             }
+            
+            if (resolvedIP == null) {
+                ConnectionProfile connectionProfile = plugin.getUserDataService().getConnectedProfiles().stream()
+                        .filter(s -> s.getCurrentNickName().equalsIgnoreCase(usernameLower))
+                        .findAny()
+                        .orElse(null);
+                if (connectionProfile != null) {
+                    resolvedIP = connectionProfile.getIP().replace("/", "");
+                    resolutionMethod = "connection profile";
+                }
+            }
+        }
+
+        if (resolvedIP == null || !StringUtil.isValidIPv4(resolvedIP)) {
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&cFailed to resolve '" + input + "' to a valid IP address."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: online players, connection profiles."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP address or ensure the player has connected before."));
+            return;
+        }
+
+        org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
+        if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
+            String playerIP = onlinePlayer.getAddress().getAddress().getHostAddress();
+            for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                if (p.getAddress() != null && p.getAddress().getAddress().getHostAddress().equals(playerIP)) {
+                    affectedAccounts.add(p.getName());
+                }
+            }
+        }
+
+        final String finalIP = resolvedIP;
+
+        if (args[1].equalsIgnoreCase("add")) {
+            iAntiBotManager.getWhitelistService().whitelist("/" + finalIP);
+            iAntiBotManager.getBlackListService().unBlacklist("/" + finalIP);
+            
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&aWhitelisted IP: &f" + finalIP));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Resolution: &f" + resolutionMethod));
+            if (!affectedAccounts.isEmpty()) {
+                sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Affected accounts (&a" + affectedAccounts.size() + "&7): &f" + String.join(", ", affectedAccounts)));
+            }
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7IP removed from blacklist."));
+        } else if (args[1].equalsIgnoreCase("remove")) {
+            iAntiBotManager.getWhitelistService().unWhitelist("/" + finalIP);
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&aRemoved from whitelist: &f" + finalIP));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Resolution: &f" + resolutionMethod));
+        } else {
+            sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.commandWrongArgument));
         }
     }
 
@@ -53,7 +112,7 @@ public class AddRemoveWhitelistCommand implements SubCommand {
     public Map<Integer, List<String>> getTabCompleter(CommandSender commandSender, Command command, String s, String[] strings) {
         Map<Integer, List<String>> map = new HashMap<>();
         map.put(1, Arrays.asList("add", "remove"));
-        map.put(2, Collections.singletonList("<Ip address to blacklist>"));
+        map.put(2, Collections.singletonList("<IP address/Player Name>"));
         return map;
     }
 

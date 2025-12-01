@@ -16,6 +16,8 @@ import me.kr1s_d.ultimateantibot.netty.TokenBucket;
 public class NettyConnectionController implements ConnectionController {
     private final ConcurrentHashMap<Channel, Player> channelToPlayer = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Channel> connIdToChannel = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> usernameToIP = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, java.util.concurrent.CopyOnWriteArrayList<String>> ipToUsernames = new ConcurrentHashMap<>();
     private static final AttributeKey<String> CONNID_KEY = AttributeKey.valueOf("uab-connid");
     private static final AttributeKey<Player> PLAYER_KEY = AttributeKey.valueOf("uab-player");
     private static final AttributeKey<TokenBucket> TB_KEY = AttributeKey.valueOf("uab-tokenbucket");
@@ -104,7 +106,14 @@ public class NettyConnectionController implements ConnectionController {
         if (addr instanceof InetSocketAddress) {
             InetSocketAddress a = (InetSocketAddress) addr;
             String id = a.getAddress().getHostAddress() + ":" + a.getPort();
+            String ip = a.getAddress().getHostAddress();
             connIdToChannel.put(id, channel);
+            if (player != null && player.getName() != null) {
+                String username = player.getName().toLowerCase();
+                usernameToIP.put(username, ip);
+                ipToUsernames.computeIfAbsent(ip, k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+                    .addIfAbsent(username);
+            }
             try { channel.attr(CONNID_KEY).set(id); } catch (Throwable ignored) {}
             try { channel.attr(PLAYER_KEY).set(player); } catch (Throwable ignored) {}
             try { channel.attr(TB_KEY).set(new TokenBucket(20, 1000)); } catch (Throwable ignored) {}
@@ -119,7 +128,20 @@ public class NettyConnectionController implements ConnectionController {
     @Override
     public void unregisterChannel(Channel channel) {
         if (channel == null) return;
-        channelToPlayer.remove(channel);
+        Player p = channelToPlayer.remove(channel);
+        if (p != null && p.getName() != null) {
+            String username = p.getName().toLowerCase();
+            String ip = usernameToIP.remove(username);
+            if (ip != null) {
+                java.util.concurrent.CopyOnWriteArrayList<String> accounts = ipToUsernames.get(ip);
+                if (accounts != null) {
+                    accounts.remove(username);
+                    if (accounts.isEmpty()) {
+                        ipToUsernames.remove(ip);
+                    }
+                }
+            }
+        }
         try { channel.attr(CONNID_KEY).set(null); } catch (Throwable ignored) {}
         List<String> toRemove = connIdToChannel.entrySet().stream().filter(en -> en.getValue().equals(channel)).map(en -> en.getKey()).collect(Collectors.toList());
         for (String k : toRemove) connIdToChannel.remove(k);
@@ -141,6 +163,34 @@ public class NettyConnectionController implements ConnectionController {
             return id;
         }
         return null;
+    }
+
+    /**
+     * Resolve IP from username (currently online players only).
+     * Returns null if username not found in active connections.
+     */
+    public String getIPFromUsername(String username) {
+        if (username == null) return null;
+        return usernameToIP.get(username.toLowerCase());
+    }
+
+    /**
+     * Get all usernames associated with an IP address.
+     * Returns empty list if no accounts found.
+     */
+    public List<String> getUsernamesOnIP(String ip) {
+        if (ip == null) return java.util.Collections.emptyList();
+        java.util.concurrent.CopyOnWriteArrayList<String> accounts = ipToUsernames.get(ip);
+        return accounts != null ? new java.util.ArrayList<>(accounts) : java.util.Collections.emptyList();
+    }
+
+    /**
+     * Check if IP has multiple accounts currently connected.
+     */
+    public boolean hasMultipleAccounts(String ip) {
+        if (ip == null) return false;
+        List<String> accounts = getUsernamesOnIP(ip);
+        return accounts.size() > 1;
     }
 
     private static void writeVarInt(ByteBuf buf, int value) {

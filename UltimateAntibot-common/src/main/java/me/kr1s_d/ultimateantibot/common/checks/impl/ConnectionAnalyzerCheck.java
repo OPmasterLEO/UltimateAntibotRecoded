@@ -1,14 +1,15 @@
 package me.kr1s_d.ultimateantibot.common.checks.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.checks.CheckType;
 import me.kr1s_d.ultimateantibot.common.checks.StaticCheck;
 import me.kr1s_d.ultimateantibot.common.objects.LimitedList;
 import me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile;
-import me.kr1s_d.ultimateantibot.common.objects.profile.entry.MessageEntry;
 import me.kr1s_d.ultimateantibot.common.objects.profile.entry.NickNameEntry;
-import me.kr1s_d.ultimateantibot.common.objects.profile.meta.ContainerType;
 import me.kr1s_d.ultimateantibot.common.objects.profile.meta.MetadataContainer;
 import me.kr1s_d.ultimateantibot.common.objects.profile.meta.ScoreTracker;
 import me.kr1s_d.ultimateantibot.common.service.CheckService;
@@ -16,12 +17,6 @@ import me.kr1s_d.ultimateantibot.common.service.UserDataService;
 import me.kr1s_d.ultimateantibot.common.service.WhitelistService;
 import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.StringUtil;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * This is not a real check, it helps detect slow bot attacks and is inserted into different

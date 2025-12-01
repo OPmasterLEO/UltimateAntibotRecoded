@@ -79,10 +79,12 @@ public class Notificator implements INotificator {
         titles.clear();
     }
 
+    @Override
     public void sendActionbar(String coloredMessage) {
         actionbars.forEach(ac -> ac.sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(coloredMessage)));
     }
 
+    @Override
     public void sendTitle(String title, String subtitle) {
         Title t = ProxyServer.getInstance().createTitle();
         String formattedTitle = ServerUtil.colorize(UltimateAntiBotBungeeCord.getInstance().getAntiBotManager().replaceInfo(title));
@@ -101,6 +103,7 @@ public class Notificator implements INotificator {
         bar.updateProgress(health);
     }
 
+    @Override
     public void init(IAntiBotPlugin plugin) {
         plugin.scheduleRepeatingTask(() -> {
             if (titles.isEmpty() && actionbars.isEmpty()) {

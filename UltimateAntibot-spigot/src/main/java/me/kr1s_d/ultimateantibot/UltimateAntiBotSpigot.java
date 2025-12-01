@@ -94,6 +94,7 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
     private VPNService VPNService;
     private Notificator notificator;
     private ThreadPoolExecutor notifierExecutor;
+    private BukkitTask flushTask;
     private UltimateAntiBotCore core;
     private SatelliteServer satellite;
     private boolean isRunning;
@@ -209,8 +210,8 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         PacketInspectorHandler sharedHandler = new PacketInspectorHandler(packetManager, netController, notifierExecutor, aggregator);
         this.notifierExecutor = notifierExecutor;
 
-        long flushTicks = msToTicks(100L);
-        new BukkitRunnable() {
+        long flushTicks = msToTicks(50L);
+        this.flushTask = new BukkitRunnable() {
             @Override
             public void run() {
                 try { aggregator.flush(); } catch (Throwable ignored) {}
@@ -248,6 +249,11 @@ public final class UltimateAntiBotSpigot extends JavaPlugin implements IAntiBotP
         if(antiBotManager != null){
             antiBotManager.getBlackListService().unload();
             antiBotManager.getWhitelistService().unload();
+        }
+        if (this.flushTask != null) {
+            try {
+                this.flushTask.cancel();
+            } catch (Throwable ignored) {}
         }
         if (this.notifierExecutor != null) {
             try {

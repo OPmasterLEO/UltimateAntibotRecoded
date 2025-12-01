@@ -76,10 +76,12 @@ public class Notificator implements INotificator {
         titles.clear();
     }
 
+    @Override
     public void sendActionbar(String coloredMessage){
         actionbars.forEach(ac -> Utils.sendActionbar(ac, coloredMessage));
     }
 
+    @Override
     public void sendTitle(String title, String subtitle){
         String formattedTitle = UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(title));
         String formattedSubtitle = UltimateAntiBotSpigot.getInstance().getAntiBotManager().replaceInfo(ServerUtil.colorize(subtitle));
@@ -99,6 +101,7 @@ public class Notificator implements INotificator {
         bar.setProgress(health);
     }
 
+    @Override
     public void init(IAntiBotPlugin plugin){
         plugin.scheduleRepeatingTask(() -> {
             if (titles.isEmpty() && actionbars.isEmpty() && (!bar.isSupported() || bar.getPlayers().isEmpty())) {

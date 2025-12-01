@@ -96,10 +96,12 @@ public class Notificator implements INotificator {
             actionbar.sendActionBar(coloredMessage);
         }
     }
+    @Override
     public void sendActionbar(String str) {
         sendActionbar(Utils.colora(str));
     }
 
+    @Override
     public void sendTitle(String title, String subtitle) {
     net.kyori.adventure.text.Component formattedTitle = Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(title));
     net.kyori.adventure.text.Component formattedSubtitle = Utils.colora(UltimateAntiBotVelocity.getInstance().getAntiBotManager().replaceInfo(subtitle));
@@ -117,6 +119,7 @@ public class Notificator implements INotificator {
         BOSS.progress(health);
     }
 
+    @Override
     public void init(IAntiBotPlugin plugin){
         plugin.scheduleRepeatingTask(() -> {
             if (titles.isEmpty() && actionbars.isEmpty()) {

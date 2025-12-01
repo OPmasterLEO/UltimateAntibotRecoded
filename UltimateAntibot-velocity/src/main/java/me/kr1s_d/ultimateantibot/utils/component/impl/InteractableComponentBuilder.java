@@ -1,9 +1,8 @@
 package me.kr1s_d.ultimateantibot.utils.component.impl;
 
 import com.velocitypowered.api.proxy.Player;
-import me.kr1s_d.ultimateantibot.utils.ColorUtils;
+
 import me.kr1s_d.ultimateantibot.utils.Utils;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;

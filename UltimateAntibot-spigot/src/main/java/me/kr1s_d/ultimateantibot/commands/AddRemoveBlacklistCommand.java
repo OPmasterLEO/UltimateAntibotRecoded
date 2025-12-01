@@ -1,19 +1,23 @@
 package me.kr1s_d.ultimateantibot.commands;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+
 import me.kr1s_d.commandframework.objects.SubCommand;
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
 import me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile;
-import me.kr1s_d.ultimateantibot.common.objects.profile.entry.NameIPEntry;
 import me.kr1s_d.ultimateantibot.common.objects.profile.mapping.IPMapping;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.StringUtil;
 import me.kr1s_d.ultimateantibot.utils.Utils;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-
-import java.util.*;
 
 public class AddRemoveBlacklistCommand implements SubCommand {
     private final IAntiBotPlugin plugin;
@@ -31,45 +35,83 @@ public class AddRemoveBlacklistCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        //name mapping execution
-        IPMapping ipMapping = iAntiBotManager.getBlackListService().getIPMapping();
-        String ipFromName = ipMapping.getIPFromName(args[2]);
-        if (ipFromName != null) {
-            args[2] = ipFromName;
-        }
-
-        if (args[1].equalsIgnoreCase("add") && !StringUtil.isValidIPv4(args[2])) {
-            ConnectionProfile connectionProfile = plugin.getUserDataService().getConnectedProfiles().stream()
-                    .filter(s -> s.getCurrentNickName().equalsIgnoreCase(args[2]))
-                    .findAny()
-                    .orElse(null);
-
-            if (connectionProfile != null) {
-                args[2] = connectionProfile.getIP();
+        final String input = args[2];
+        String resolvedIP = null;
+        String resolutionMethod = null;
+        List<String> affectedAccounts = new java.util.ArrayList<>();
+        if (StringUtil.isValidIPv4(input)) {
+            resolvedIP = input.replace("/", "");
+            resolutionMethod = "direct IP";
+        } else {
+            final String usernameLower = input.toLowerCase();
+            IPMapping ipMapping = iAntiBotManager.getBlackListService().getIPMapping();
+            String ipFromMapping = ipMapping.getIPFromName(input);
+            if (ipFromMapping != null) {
+                resolvedIP = ipFromMapping.replace("/", "");
+                resolutionMethod = "historical mapping";
+            }
+            
+            if (resolvedIP == null && plugin instanceof me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot) {
+                me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot spigotPlugin = (me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot) plugin;
+                org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
+                if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
+                    resolvedIP = onlinePlayer.getAddress().getAddress().getHostAddress();
+                    resolutionMethod = "online player";
+                }
+            }
+            
+            if (resolvedIP == null) {
+                ConnectionProfile connectionProfile = plugin.getUserDataService().getConnectedProfiles().stream()
+                        .filter(s -> s.getCurrentNickName().equalsIgnoreCase(usernameLower))
+                        .findAny()
+                        .orElse(null);
+                if (connectionProfile != null) {
+                    resolvedIP = connectionProfile.getIP().replace("/", "");
+                    resolutionMethod = "connection profile";
+                }
             }
         }
 
-        if (!StringUtil.isValidIPv4(args[2])) {
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&FThe IP entered is invalid or the player's name is not present in the database"));
+        if (resolvedIP == null || !StringUtil.isValidIPv4(resolvedIP)) {
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&cFailed to resolve '" + input + "' to a valid IP address."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: IPMapping, online players, connection profiles."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP address or ensure the player has connected before."));
             return;
         }
 
-        //remove slash
-        args[2] = args[2].replace("/", "");
+        if (plugin instanceof me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot) {
+            org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
+            if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
+                String playerIP = onlinePlayer.getAddress().getAddress().getHostAddress();
+                for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    if (p.getAddress() != null && p.getAddress().getAddress().getHostAddress().equals(playerIP)) {
+                        affectedAccounts.add(p.getName());
+                    }
+                }
+            }
+        }
+
+        final String finalIP = resolvedIP;
 
         if (args[1].equalsIgnoreCase("add")) {
-            iAntiBotManager.getBlackListService().blacklist("/" + args[2], BlackListReason.ADMIN, plugin.getUserDataService().getProfile("/" + args[2]).getCurrentNickName());
-            iAntiBotManager.getWhitelistService().unWhitelist("/" + args[2]);
-            plugin.disconnect("/" + args[2], MessageManager.getBlacklistedMessage(iAntiBotManager.getBlackListService().getProfile("/" + args[2])));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.getCommandAdded(args[2], "blacklist")));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7PS: The IP has been removed from the whitelist as it has been blacklisted!"));
-        } else {
-            if (args[1].equalsIgnoreCase("remove")) {
-                iAntiBotManager.getBlackListService().unBlacklist("/" + args[2]);
-                sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.getCommandRemove(args[2], "blacklist")));
-            } else {
-                sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.commandWrongArgument));
+            iAntiBotManager.getBlackListService().blacklist("/" + finalIP, BlackListReason.ADMIN, 
+                plugin.getUserDataService().getProfile("/" + finalIP).getCurrentNickName());
+            iAntiBotManager.getWhitelistService().unWhitelist("/" + finalIP);
+            plugin.disconnect("/" + finalIP, MessageManager.getBlacklistedMessage(
+                iAntiBotManager.getBlackListService().getProfile("/" + finalIP)));
+            
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&aBlacklisted IP: &f" + finalIP));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Resolution: &f" + resolutionMethod));
+            if (!affectedAccounts.isEmpty()) {
+                sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Affected accounts (&c" + affectedAccounts.size() + "&7): &f" + String.join(", ", affectedAccounts)));
             }
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7IP removed from whitelist."));
+        } else if (args[1].equalsIgnoreCase("remove")) {
+            iAntiBotManager.getBlackListService().unBlacklist("/" + finalIP);
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&aRemoved from blacklist: &f" + finalIP));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Resolution: &f" + resolutionMethod));
+        } else {
+            sender.sendMessage(Utils.colora(MessageManager.prefix + MessageManager.commandWrongArgument));
         }
     }
 
