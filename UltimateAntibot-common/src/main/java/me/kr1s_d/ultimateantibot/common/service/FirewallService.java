@@ -1,13 +1,13 @@
 package me.kr1s_d.ultimateantibot.common.service;
 
+import java.util.ArrayDeque;
+import java.util.List;
+import java.util.Queue;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.IConfiguration;
 import me.kr1s_d.ultimateantibot.common.objects.FancyPair;
 import me.kr1s_d.ultimateantibot.common.utils.RuntimeUtil;
-
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Queue;
 
 public class FirewallService {
     private final IAntiBotPlugin plugin;
@@ -57,7 +57,6 @@ public class FirewallService {
             return;
         }
         if (!isEnabled) return;
-        //We avoid that in the event of a crash, something remains in the residual vps
         shutDownFirewall();
         plugin.getLogHelper().info("Trying to hook in IPTables & IPSet...");
 

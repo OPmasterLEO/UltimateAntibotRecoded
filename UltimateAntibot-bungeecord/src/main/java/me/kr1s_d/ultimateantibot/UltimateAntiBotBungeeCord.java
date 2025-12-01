@@ -1,9 +1,31 @@
 package me.kr1s_d.ultimateantibot;
 
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import me.kr1s_d.ultimateantibot.commands.CommandManager;
-import me.kr1s_d.ultimateantibot.commands.subcommands.*;
-import me.kr1s_d.ultimateantibot.common.*;
+import me.kr1s_d.ultimateantibot.commands.subcommands.AddRemoveBlacklistCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.AddRemoveWhitelistCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.AttackLogCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.CacheCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.CheckIDCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.ClearCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.ConnectionProfileCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.DumpCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.FirewallCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.HelpCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.ReloadCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.StatsCommand;
+import me.kr1s_d.ultimateantibot.commands.subcommands.ToggleNotificationCommand;
+import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.IConfiguration;
+import me.kr1s_d.ultimateantibot.common.INotificator;
+import me.kr1s_d.ultimateantibot.common.IServerPlatform;
+import me.kr1s_d.ultimateantibot.common.UABRunnable;
 import me.kr1s_d.ultimateantibot.common.core.UltimateAntiBotCore;
 import me.kr1s_d.ultimateantibot.common.core.server.SatelliteServer;
 import me.kr1s_d.ultimateantibot.common.core.thread.AnimationThread;
@@ -17,7 +39,11 @@ import me.kr1s_d.ultimateantibot.common.service.AttackTrackerService;
 import me.kr1s_d.ultimateantibot.common.service.FirewallService;
 import me.kr1s_d.ultimateantibot.common.service.UserDataService;
 import me.kr1s_d.ultimateantibot.common.service.VPNService;
-import me.kr1s_d.ultimateantibot.common.utils.*;
+import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
+import me.kr1s_d.ultimateantibot.common.utils.FilesUpdater;
+import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
+import me.kr1s_d.ultimateantibot.common.utils.Updater;
 import me.kr1s_d.ultimateantibot.listener.CustomEventListener;
 import me.kr1s_d.ultimateantibot.listener.HandShakeListener;
 import me.kr1s_d.ultimateantibot.listener.MainEventListener;
@@ -32,11 +58,6 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.api.scheduler.ScheduledTask;
 import net.md_5.bungee.api.scheduler.TaskScheduler;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public final class UltimateAntiBotBungeeCord extends Plugin implements IAntiBotPlugin, IServerPlatform {
     private static UltimateAntiBotBungeeCord instance;
@@ -87,7 +108,6 @@ public final class UltimateAntiBotBungeeCord extends Plugin implements IAntiBotP
             e.printStackTrace();
             throw e;
         }
-        //Version.init(this);
         new Metrics(this, 11712);
         this.logHelper.info("&fLoading &cUltimateAntiBot...");
         this.firewallService = new FirewallService(this);
@@ -134,7 +154,6 @@ public final class UltimateAntiBotBungeeCord extends Plugin implements IAntiBotP
         commandManager.register(new CacheCommand());
         commandManager.register(new ConnectionProfileCommand(this));
         commandManager.setDefaultCommandWrongArgumentMessage(MessageManager.commandWrongArgument);
-        //commandManager.register(new SatelliteCommand(this));
         ProxyServer.getInstance().getPluginManager().registerCommand(this, commandManager);
         ProxyServer.getInstance().getPluginManager().registerListener(this, new PingListener(this));
         ProxyServer.getInstance().getPluginManager().registerListener(this, new MainEventListener(this));

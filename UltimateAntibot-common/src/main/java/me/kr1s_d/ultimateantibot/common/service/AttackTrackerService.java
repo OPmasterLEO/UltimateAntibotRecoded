@@ -1,10 +1,5 @@
 package me.kr1s_d.ultimateantibot.common.service;
 
-import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-import me.kr1s_d.ultimateantibot.common.IService;
-import me.kr1s_d.ultimateantibot.common.objects.attack.AttackLog;
-import me.kr1s_d.ultimateantibot.common.utils.*;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,6 +7,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
+import me.kr1s_d.ultimateantibot.common.IService;
+import me.kr1s_d.ultimateantibot.common.objects.attack.AttackLog;
+import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
+import me.kr1s_d.ultimateantibot.common.utils.DateUtil;
+import me.kr1s_d.ultimateantibot.common.utils.FileUtil;
+import me.kr1s_d.ultimateantibot.common.utils.SerializeUtil;
+import me.kr1s_d.ultimateantibot.common.utils.ServerUtil;
 
 public class AttackTrackerService implements IService {
     private final IAntiBotPlugin plugin;
@@ -33,23 +37,20 @@ public class AttackTrackerService implements IService {
             this.nextAttackID = Integer.parseInt(nextAttackID);
         }catch (NumberFormatException e) {
             this.nextAttackID = 0;
-            logFiles.forEach(File::delete); //reset files to avoid duplicates...
+            logFiles.forEach(File::delete);
         }
 
         try {
-            //case no files
             if(logFiles.size() == 0){
                 attackLogList = new ArrayList<>();
                 return;
             }
 
-            //with files
             for (File file : logFiles) {
                 try {
                     String encoded = FileUtil.getEncodedBase64(file);
                     AttackLog log = SerializeUtil.deserialize(encoded, AttackLog.class);
                     if(log == null) continue;
-                    //remove logs older than config section
                     if(ConfigManger.getAutoPurgerBoolean("logs.enabled")) {
                         long pastedDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - log.getStopMillis());
                         if(pastedDays > ConfigManger.getAutoPurgerValue("logs.value")) {

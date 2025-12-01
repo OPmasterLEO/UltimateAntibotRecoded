@@ -1,7 +1,14 @@
 package me.kr1s_d.ultimateantibot.common.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.IConfiguration;
 import me.kr1s_d.ultimateantibot.common.IService;
@@ -12,9 +19,6 @@ import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListReason;
 import me.kr1s_d.ultimateantibot.common.objects.profile.entry.NameIPEntry;
 import me.kr1s_d.ultimateantibot.common.objects.profile.mapping.IPMapping;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 public class BlackListService implements IService {
 
     private final FirewallService firewallService;
@@ -23,10 +27,6 @@ public class BlackListService implements IService {
     private final IConfiguration blacklistConfig;
     private final LogHelper logHelper;
 
-    /**
-     * @param blacklistConfig - IConfiguration for BlackList Service
-     * @param logHelper       - LogHelper for debug
-     */
     public BlackListService(IAntiBotPlugin plugin, QueueService queueService, IConfiguration blacklistConfig, LogHelper logHelper) {
         this.firewallService = plugin.getFirewallService();
         this.queueService = queueService;
@@ -34,10 +34,6 @@ public class BlackListService implements IService {
         this.blacklistConfig = blacklistConfig;
         this.logHelper = logHelper;
     }
-
-    /**
-     * Adapt / DeAdapt IP Strings To File Saving...
-     */
 
     private String toFileString(String str) {
         return str.replace(".", ",");
@@ -47,9 +43,6 @@ public class BlackListService implements IService {
         return str.replace(",", ".");
     }
 
-    /**
-     * Loading Configuration From File
-     */
     @Override
     public void load() {
         for (String a : blacklistConfig.getConfigurationSection("data")) {
@@ -109,11 +102,6 @@ public class BlackListService implements IService {
         return (int) blacklist.estimatedSize();
     }
 
-    /**
-     * @param ip     The IP to BlackList
-     * @param reason The Reason for BlackList
-     * @param name   The name of the player
-     */
     @UnderAttackMethod
     public void blacklist(String ip, BlackListReason reason, String name) {
         if (blacklist.getIfPresent(ip) != null) {
@@ -124,10 +112,6 @@ public class BlackListService implements IService {
         firewallService.firewall(ip);
     }
 
-    /**
-     * @param ip     The IP to BlackList
-     * @param reason The Reason for BlackList
-     */
     @UnderAttackMethod
     public void blacklist(String ip, BlackListReason reason) {
         if (blacklist.getIfPresent(ip) != null) {

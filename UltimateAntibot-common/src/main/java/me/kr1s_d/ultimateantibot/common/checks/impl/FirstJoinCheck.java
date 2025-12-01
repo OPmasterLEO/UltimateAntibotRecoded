@@ -27,7 +27,6 @@ public class FirstJoinCheck implements JoinCheck {
      */
     public boolean isDenied(String ip, String name) {
         if(!isEnabled()) {
-            //executes first join for other checks but not kicks player
             userDataService.isFirstJoin(ip, name);
             return false;
         }
@@ -56,12 +55,10 @@ public class FirstJoinCheck implements JoinCheck {
 
     @Override
     public void clearCache() {
-        //not supported here
     }
 
     @Override
     public void removeCache(String ip) {
-        //NOT SUPPORTED HERE
     }
 
     public void loadTask() {
