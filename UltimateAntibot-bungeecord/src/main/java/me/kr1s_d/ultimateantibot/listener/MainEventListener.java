@@ -180,9 +180,6 @@ public class MainEventListener implements Listener {
             return;
         }
 
-        //
-        //AntiBotMode Normal - skip for whitelisted
-        //
         if (!isWhitelisted && (antiBotManager.isAntiBotModeEnabled() || antiBotManager.isSlowAntiBotModeEnabled())) {
             e.setCancelReason(KComponentBuilder.colorized(
                     MessageManager.getAntiBotModeMessage(String.valueOf(ConfigManger.authPercent), String.valueOf(ServerUtil.blacklistPercentage))
@@ -191,9 +188,7 @@ public class MainEventListener implements Listener {
             return;
         }
 
-        //
-        //FirstJoinCheck
-        //
+
         if (firstJoinCheck.isDenied(ip, name)) {
             e.setCancelReason(KComponentBuilder.colorized(MessageManager.firstJoinMessage));
             e.setCancelled(true);
@@ -229,22 +224,13 @@ public class MainEventListener implements Listener {
             return;
         }
 
-        //If isn't whitelisted
         if (!antiBotManager.getWhitelistService().isWhitelisted(ip)) {
-            //Add to last join
             antiBotManager.getJoinCache().addJoined(ip);
-            //Auto Whitelist Task
             plugin.scheduleDelayedTask(new AutoWhitelistTask(plugin, ip), false, 1000L * ConfigManger.playtimeForWhitelist * 60L);
-            //Remove from JoinCache after 30 Seconds (committed since cache added auto removal in JoinCache)
-            //plugin.scheduleDelayedTask(() -> antiBotManager.getJoinCache().removeJoined(ip), false, 1000L * 30);
-            //
-            //Connection check (ProxyCheck.io or ip-api.com)
-            //
             if (!player.hasPermission("uab.bypass.vpn")) {
                 VPNService.submitIP(ip, nickname);
             }
         }
-        //Notification
         if (player.hasPermission("uab.notification.automatic") && antiBotManager.isSomeModeOnline()) {
             Notificator.automaticNotification(player);
         }
@@ -255,28 +241,16 @@ public class MainEventListener implements Listener {
         String ip = Utils.getIP(e.getSender());
         String nickname = ((ProxiedPlayer) e.getSender()).getName();
 
-        //
-        //Register Check
-        //
         registerCheck.onChat(ip, nickname, e.getMessage());
-        //
-        // Connection Analyze
-        //
         CheckService.getCheck(CheckType.CONNECTION_ANALYZE, ConnectionAnalyzerCheck.class).onChat(ip, nickname, e.getMessage());
     }
 
     @EventHandler
     public void onPing(ProxyPingEvent e) {
         String ip = Utils.getIP(e.getConnection());
-        //
-        //Auth Check Ping Action
-        //
         if (ServerUtil.blacklistPercentage >= ConfigManger.authPercent && antiBotManager.isAntiBotModeEnabled()) {
             authCheck.onPing(e, ip);
         }
-        //
-        //Connection Analyze
-        //
         CheckService.getCheck(CheckType.CONNECTION_ANALYZE, ConnectionAnalyzerCheck.class).onPing(ip);
     }
 
@@ -289,10 +263,8 @@ public class MainEventListener implements Listener {
             return;
         }
 
-        //decrease to prevent false flags for a lot of joins
         if(antiBotManager.getWhitelistService().isWhitelisted(ip) && antiBotManager.getJoinCache().isJoined(ip)) {
             antiBotManager.getDynamicJoins().decrease();
-            //removed from joined to prevent multiple decreases due server switching
             antiBotManager.getJoinCache().removeJoined(ip);
         }
         plugin.getLogHelper().debug("[EVENT] Server switch for " + ip);
@@ -302,34 +274,16 @@ public class MainEventListener implements Listener {
     public void onUnLogin(PlayerDisconnectEvent e) {
         String ip = Utils.getIP(e.getPlayer());
         Notificator.onQuit(e.getPlayer());
-        //
-        //Packet Check
-        //
         packetCheck.onUnLogin(ip);
-        //
-        //Account Check
-        //
         accountCheck.onDisconnect(ip, e.getPlayer().getName());
-        //
-        //connection profiles
-        //
         userDataService.registerQuit(ip);
-        //
-        //Invalid name check
-        //
         invalidNameCheck.onDisconnect(ip, e.getPlayer().getName());
-        //
-        //Register check
-        //
         registerCheck.onDisconnect(ip, e.getPlayer().getName());
     }
 
     @EventHandler
     public void onSettings(SettingsChangedEvent e) {
         String ip = Utils.getIP(e.getPlayer());
-        //
-        //PacketCheck
-        //
         packetCheck.registerPacket(ip);
     }
 

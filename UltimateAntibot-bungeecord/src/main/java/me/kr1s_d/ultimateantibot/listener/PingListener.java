@@ -28,7 +28,6 @@ public class PingListener implements Listener {
 
         antiBotManager.increasePingPerSecond();
 
-        //PingMode checks
         if(antiBotManager.isSomeModeOnline()){
             if(!ConfigManger.pingModeSendInfo){
                 ServerPing ping = e.getResponse();
@@ -36,13 +35,11 @@ public class PingListener implements Listener {
                 e.setResponse(ping);
             }
         }
-        //Enable ping mode
         if(antiBotManager.getPingPerSecond() > ConfigManger.pingModeTrigger && !antiBotManager.isAntiBotModeEnabled()){
             if(!antiBotManager.isPingModeEnabled()){
                 antiBotManager.enablePingMode();
             }
         }
-        //Whitelist protection
         if(whitelistService.isWhitelisted(ip)){
             queueService.removeQueue(ip);
         }
