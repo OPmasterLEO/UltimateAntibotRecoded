@@ -61,7 +61,7 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
 
             for (NickNameEntry currentNickname : nickHistory) {
                 String name1 = currentNickname.getName();
-                if (name1 == null || name1.length() < 3) continue; // Skip very short names
+                if (name1 == null || name1.length() < 3) continue;
                 for (ConnectionProfile otherProfile : last) {
                     if (profile == otherProfile) continue;
                     if (whitelistService.isWhitelisted(otherProfile.getIP())) continue;
@@ -73,12 +73,10 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
                         String name2 = otherNickname.getName();
                         if (name2 == null || name2.length() < 3) continue;
                         
-                        // Length pre-filter: if lengths differ by more than 30%, skip comparison
                         int lenDiff = Math.abs(name1.length() - name2.length());
                         if (lenDiff > name1.length() * 0.3) continue;
                         
-                        // Calculate similarity with optimized algorithm
-                        if (StringUtil.calculateSimilarity(name1, name2) > 80) {
+                        if (StringUtil.calculateSimilarity(name1, name2) > ConfigManger.connectionAnalyzeNameSimilarity) {
                             if (!suspected.contains(profile)) suspected.add(profile);
                             if (!suspected.contains(otherProfile)) suspected.add(otherProfile);
                         }
@@ -99,9 +97,8 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
         if (profile == null) return;
         profile.trackChat(message);
         
-        // Optimized chat similarity detection
         List<ConnectionProfile> last = userDataService.getLastJoinedAndConnectedProfiles(15);
-        if (last.size() < 2) return; // Need at least 2 profiles
+        if (last.size() < 2) return;
 
         List<String> entries = new ArrayList<>();
         for (ConnectionProfile p : last) {
@@ -134,13 +131,12 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
 
         int similarCount = 0;
         for (String entry : entries) {
-            // Early skip for small messages or entry
             if (StringUtil.spaces(message) < 2 && message.length() < 5) continue;
             if (StringUtil.spaces(entry) < 2 && entry.length() < 5) continue;
             int lenDiff = Math.abs(message.length() - entry.length());
             if (lenDiff > message.length() * 0.5) continue;
             
-            if (StringUtil.calculateSimilarity(message, entry) > 85) {
+            if (StringUtil.calculateSimilarity(message, entry) > ConfigManger.connectionAnalyzeChatSimilarity) {
                 similarCount++;
                 chatSuspected.incrementInt(profile, 0);
             }

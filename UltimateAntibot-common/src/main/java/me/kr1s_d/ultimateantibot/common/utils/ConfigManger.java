@@ -1,12 +1,12 @@
 package me.kr1s_d.ultimateantibot.common.utils;
 
+import java.util.List;
+import java.util.SplittableRandom;
+
 import me.kr1s_d.ultimateantibot.common.IConfiguration;
 import me.kr1s_d.ultimateantibot.common.objects.config.ProxyCheckConfig;
 import me.kr1s_d.ultimateantibot.common.objects.config.SlowCheckConfig;
 import me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile;
-
-import java.util.List;
-import java.util.SplittableRandom;
 
 public class ConfigManger {
     public static int joinCacheJoinMinutes = 2;
@@ -66,6 +66,10 @@ public class ConfigManger {
     public static ConnectionProfile.ConnectionScore connectionAnalyzeBlacklistFrom;
     public static boolean isConnectionAnalyzeEnabled;
     public static boolean isIPApiVerificationEnabled;
+    public static int strangePlayerGraceSeconds;
+    public static int invalidNameGraceSeconds;
+    public static int connectionAnalyzeNameSimilarity;
+    public static int connectionAnalyzeChatSimilarity;
     private static SlowCheckConfig packetSlowCheckConfig;
     private static SlowCheckConfig accountCheckConfig;
     private static ProxyCheckConfig proxyCheckConfig;
@@ -128,6 +132,10 @@ public class ConfigManger {
         connectionAnalyzeBlacklistFrom = ConnectionProfile.ConnectionScore.valueOf(getParamOrDefault("checks.connection-analyze.blacklist-from", ConnectionProfile.ConnectionScore.ALMOST_BOT.name()));
         connectionAnalyzeBlacklistTrigger = cfg.getInt("checks.connection-analyze.blacklist-trigger");
         isConnectionAnalyzeEnabled = cfg.getBoolean("checks.connection-analyze.enabled");
+        strangePlayerGraceSeconds = parseOrDefault(cfg.getString("checks.grace.strange-player"), 15);
+        invalidNameGraceSeconds = parseOrDefault(cfg.getString("checks.grace.invalid-name"), 15);
+        connectionAnalyzeNameSimilarity = parseOrDefault(cfg.getString("checks.connection-analyze.name-similarity"), 90);
+        connectionAnalyzeChatSimilarity = parseOrDefault(cfg.getString("checks.connection-analyze.chat-similarity"), 92);
         if(isReload) return;
         packetSlowCheckConfig = new SlowCheckConfig(cfg, "checks.slowjoin.packet");
         accountCheckConfig = new SlowCheckConfig(cfg, "checks.slowjoin.account");
@@ -217,5 +225,14 @@ public class ConfigManger {
         }
 
         return string;
+    }
+
+    private static int parseOrDefault(String s, int def) {
+        if(s == null) return def;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception ignored) {
+            return def;
+        }
     }
 }

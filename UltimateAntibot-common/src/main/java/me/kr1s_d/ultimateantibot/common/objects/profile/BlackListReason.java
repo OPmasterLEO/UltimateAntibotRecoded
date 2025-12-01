@@ -9,12 +9,12 @@ public enum BlackListReason {
     ADMIN(MessageManager.reasonAdmin),
     @Deprecated
     STRANGE_PLAYER(MessageManager.reasonAdmin),
-    STRANGE_PLAYER_INVALID_NAME(MessageManager.reasonStrangePlayer),
-    STRANGE_PLAYER_INVALID_PROTOCOL(MessageManager.reasonStrangePlayer),
-    STRANGE_PLAYER_REGISTER(MessageManager.reasonStrangePlayer),
-    STRANGE_PLAYER_PACKET(MessageManager.reasonStrangePlayer),
-    STRANGE_PLAYER_CONNECTION(MessageManager.reasonStrangePlayer),
-    STRANGE_PLAYER_SLOW_JOIN(MessageManager.reasonStrangePlayer),
+    STRANGE_PLAYER_INVALID_NAME(MessageManager.reasonStrangePlayer + " [name]"),
+    STRANGE_PLAYER_INVALID_PROTOCOL(MessageManager.reasonStrangePlayer + " [protocol]"),
+    STRANGE_PLAYER_REGISTER(MessageManager.reasonStrangePlayer + " [register]"),
+    STRANGE_PLAYER_PACKET(MessageManager.reasonStrangePlayer + " [packet]"),
+    STRANGE_PLAYER_CONNECTION(MessageManager.reasonStrangePlayer + " [connection]"),
+    STRANGE_PLAYER_SLOW_JOIN(MessageManager.reasonStrangePlayer + " [slow-join]"),
     VPN(MessageManager.reasonVPN);
 
     private final String reason;

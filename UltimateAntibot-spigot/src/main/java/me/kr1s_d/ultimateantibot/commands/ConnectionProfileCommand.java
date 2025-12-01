@@ -89,13 +89,14 @@ public class ConnectionProfileCommand implements SubCommand {
 
     @Override
     public Map<Integer, List<String>> getTabCompleter(CommandSender sender, Command command, String alias, String[] args) {
-        Map<String, String> map2 = new HashMap<>();
-        for (ConnectionProfile profile : service.getConnectedProfiles()) {
-            map2.put(profile.getCurrentNickName(), profile.getIP());
-        }
-
         Map<Integer, List<String>> map = new HashMap<>();
-        map.put(1, new ArrayList<>(map2.keySet()));
+        List<String> names = new ArrayList<>();
+        for (ConnectionProfile p : service.getConnectedProfiles()) names.add(p.getCurrentNickName());
+        for (ConnectionProfile p : service.getProfiles()) {
+            for (me.kr1s_d.ultimateantibot.common.objects.profile.entry.NickNameEntry n : p.getLastNickNames()) names.add(n.getName());
+        }
+        if(names.isEmpty()) names.add("<player>");
+        map.put(1, names);
         return map;
     }
 

@@ -165,10 +165,48 @@ public class UserDataService implements IService {
                 profile.setFirstJoin(true);
                 plugin.disconnect(profile.getIP(), MessageManager.getSafeModeMessage());
                 if (blacklist) {
-                    plugin.getAntiBotManager().getBlackListService().blacklist(profile.getIP(), BlackListReason.STRANGE_PLAYER_CONNECTION, profile.getCurrentNickName());
+                    int distinctSignals = countDistinctSignals(profile);
+                    if(distinctSignals >= 2) {
+                        plugin.getAntiBotManager().getBlackListService().blacklist(profile.getIP(), BlackListReason.STRANGE_PLAYER_CONNECTION, profile.getCurrentNickName());
+                    }
                 }
             }
         }
+    }
+
+    private int countDistinctSignals(ConnectionProfile profile) {
+        int c = 0;
+        for(me.kr1s_d.ultimateantibot.common.objects.profile.meta.ScoreTracker.ScoreID id : me.kr1s_d.ultimateantibot.common.objects.profile.meta.ScoreTracker.ScoreID.values()) {
+            if(!profile.getScoreTracker().getScoresByID(id).isEmpty()) {
+                switch (id) {
+                    case ABNORMAL_NAME:
+                    case ABNORMAL_CHAT_MESSAGE:
+                    case CHANGE_NAME:
+                    case JOIN_NO_PING:
+                        c++;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        return c;
+    }
+
+    public String getDistinctSignalMetricsSnapshot() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("signals-distribution:");
+        int n0=0,n1=0,n2=0,n3=0,n4=0;
+        for(ConnectionProfile p : onlineProfiles) {
+            int s = countDistinctSignals(p);
+            if(s==0) n0++; else if(s==1) n1++; else if(s==2) n2++; else if(s==3) n3++; else n4++;
+        }
+        sb.append("0=").append(n0).append(',');
+        sb.append("1=").append(n1).append(',');
+        sb.append("2=").append(n2).append(',');
+        sb.append("3=").append(n3).append(',');
+        sb.append("4p=").append(n4);
+        return sb.toString();
     }
 
     public List<ConnectionProfile> getProfiles() {

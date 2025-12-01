@@ -121,7 +121,21 @@ public class AddRemoveWhitelistCommand implements SubCommand {
     public Map<Integer, List<String>> getTabCompleter(CommandSender commandSender, Command command, String s, String[] strings) {
         Map<Integer, List<String>> map = new HashMap<>();
         map.put(1, Arrays.asList("add", "remove"));
-        map.put(2, Collections.singletonList("<IP/Player/ID>"));
+        List<String> dyn = new java.util.ArrayList<>();
+        for(org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            dyn.add(p.getName());
+            if(p.getAddress()!=null) dyn.add(p.getAddress().getAddress().getHostAddress());
+        }
+        for(String ip : iAntiBotManager.getBlackListService().getBlackListedIPS()) {
+            me.kr1s_d.ultimateantibot.common.objects.profile.BlackListProfile pr = iAntiBotManager.getBlackListService().getProfile(ip);
+            if(pr!=null) dyn.add(pr.getId());
+            dyn.add(ip.replace("/", ""));
+        }
+        for(String ip : iAntiBotManager.getWhitelistService().getWhitelistedIPS()) {
+            dyn.add(ip.replace("/", ""));
+        }
+        if(dyn.isEmpty()) dyn.add("<IP/Player/ID>");
+        map.put(2, dyn);
         return map;
     }
 

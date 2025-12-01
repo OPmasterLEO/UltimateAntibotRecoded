@@ -2,7 +2,9 @@ package me.kr1s_d.ultimateantibot.common.checks.impl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,13 +19,15 @@ import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 public class InvalidNameCheck implements JoinCheck {
     private final IAntiBotPlugin plugin;
     private final IAntiBotManager antiBotManager;
-    private final List<String> invalidNames;
+    private final Set<String> invalidNames;
     private final List<Pattern> compiledPatterns;
+    private static final int MIN_TOKEN_LENGTH = 4;
+    private static final long GRACE_PERIOD_SECONDS = ConfigManger.invalidNameGraceSeconds;
     
     public InvalidNameCheck(IAntiBotPlugin plugin) {
         this.plugin = plugin;
         this.antiBotManager = plugin.getAntiBotManager();
-        this.invalidNames = new ArrayList<>();
+        this.invalidNames = new HashSet<>();
         this.compiledPatterns = new ArrayList<>();
 
         for (String invalidNamesBlockedEntry : ConfigManger.invalidNamesBlockedEntries) {
@@ -33,7 +37,10 @@ public class InvalidNameCheck implements JoinCheck {
                     compiledPatterns.add(Pattern.compile(regexFormula, Pattern.CASE_INSENSITIVE));
                     plugin.getLogHelper().debug("[REGEX VALIDATOR] Input: " + regexFormula + " complete array: " + Arrays.toString(invalidNamesBlockedEntry.split("-", 2)));
                 }else{
-                    invalidNames.add(invalidNamesBlockedEntry.toLowerCase());
+                    String token = invalidNamesBlockedEntry.toLowerCase();
+                    if(token.length() >= MIN_TOKEN_LENGTH) {
+                        invalidNames.add(token);
+                    }
                 }
             }catch (Exception e) {
                 plugin.getLogHelper().error("Unable to validate regex for input " + invalidNamesBlockedEntry);
@@ -52,28 +59,49 @@ public class InvalidNameCheck implements JoinCheck {
     @Override
     public boolean isDenied(String ip, String name) {
         String nameLower = name.toLowerCase();
-        for(String blacklisted : invalidNames){
-            if(nameLower.contains(blacklisted)) {
+        int hits = 0;
+        for(String token : invalidNames){
+            if(nameLower.equals(token) || nameLower.startsWith(token) || nameLower.endsWith(token)) {
+                hits++;
+            } else {
+                int idx = nameLower.indexOf(token);
+                if(idx != -1) {
+                    boolean boundaryLeft = idx == 0 || !Character.isLetterOrDigit(nameLower.charAt(idx - 1));
+                    int end = idx + token.length();
+                    boolean boundaryRight = end >= nameLower.length() || !Character.isLetterOrDigit(nameLower.charAt(end));
+                    if(boundaryLeft && boundaryRight) hits++;
+                }
+            }
+            if(hits >= 2) break;
+        }
+
+        boolean regexHit = false;
+        if(hits == 0) {
+            for (Pattern pattern : compiledPatterns) {
+                try {
+                    Matcher matcher = pattern.matcher(name);
+                    if(matcher.matches()) {
+                        regexHit = true;
+                        break;
+                    }
+                }catch (Exception ignored){
+                }
+            }
+        }
+
+        if(hits > 0 || regexHit) {
+            long firstJoinAgo = plugin.getUserDataService().getProfile(ip).getSecondsFromFirstJoin();
+            if(firstJoinAgo < GRACE_PERIOD_SECONDS) {
+                plugin.getUserDataService().getProfile(ip).process(me.kr1s_d.ultimateantibot.common.objects.profile.meta.ScoreTracker.ScoreID.ABNORMAL_NAME);
+                return false;
+            }
+            if(hits + (regexHit ? 1 : 0) >= 2) {
                 antiBotManager.getBlackListService().blacklist(ip, BlackListReason.STRANGE_PLAYER_INVALID_NAME, name);
-                plugin.getLogHelper().debug("[UAB DEBUG] Detected attack on InvalidNameCheck! (name)");
+                plugin.getLogHelper().debug("[UAB DEBUG] Detected attack on InvalidNameCheck (multi-hit)");
                 return true;
             }
+            plugin.getUserDataService().getProfile(ip).process(me.kr1s_d.ultimateantibot.common.objects.profile.meta.ScoreTracker.ScoreID.ABNORMAL_NAME);
         }
-
-        for (Pattern pattern : compiledPatterns) {
-            try {
-                Matcher matcher = pattern.matcher(name);
-
-                if(matcher.matches()) {
-                    antiBotManager.getBlackListService().blacklist(ip, BlackListReason.STRANGE_PLAYER_INVALID_NAME, name);
-                    plugin.getLogHelper().debug("[UAB DEBUG] Detected attack on InvalidNameCheck! (regex)");
-                    return true;
-                }
-            }catch (Exception e){
-                plugin.getLogHelper().error("Unable to validate regex for pattern " + pattern.pattern());
-            }
-        }
-        
         return false;
     }
 

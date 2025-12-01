@@ -44,7 +44,9 @@ public class HelpCommand implements SubCommand {
 
     @Override
     public Map<Integer, List<String>> getTabCompleter(CommandSender commandSender, Command command, String s, String[] strings) {
-        return null;
+        Map<Integer, List<String>> map = new java.util.HashMap<>();
+        map.put(0, java.util.Collections.singletonList("help"));
+        return map;
     }
 
     @Override

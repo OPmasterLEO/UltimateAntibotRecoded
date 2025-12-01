@@ -80,7 +80,13 @@ public class CheckIDCommand implements SubCommand {
     @Override
     public Map<Integer, List<String>> getTabCompleter(CommandSender commandSender, Command command, String s, String[] strings) {
         Map<Integer, List<String>> map = new HashMap<>();
-        map.put(1, Collections.singletonList("<id to check>"));
+        List<String> ids = new java.util.ArrayList<>();
+        for(String ip : plugin.getAntiBotManager().getBlackListService().getBlackListedIPS()) {
+            me.kr1s_d.ultimateantibot.common.objects.profile.BlackListProfile pr = plugin.getAntiBotManager().getBlackListService().getProfile(ip);
+            if(pr!=null) ids.add(pr.getId());
+        }
+        if(ids.isEmpty()) ids.add("<id>");
+        map.put(1, ids);
         return map;
     }
 

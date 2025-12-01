@@ -22,12 +22,14 @@ import me.kr1s_d.ultimateantibot.common.objects.profile.mapping.IPMapping;
 public class BlackListService implements IService {
 
     private final FirewallService firewallService;
+    private final IAntiBotPlugin plugin;
     private final QueueService queueService;
     private final Cache<String, BlackListProfile> blacklist;
     private final IConfiguration blacklistConfig;
     private final LogHelper logHelper;
 
     public BlackListService(IAntiBotPlugin plugin, QueueService queueService, IConfiguration blacklistConfig, LogHelper logHelper) {
+        this.plugin = plugin;
         this.firewallService = plugin.getFirewallService();
         this.queueService = queueService;
         this.blacklist = Caffeine.newBuilder().build();
@@ -107,6 +109,7 @@ public class BlackListService implements IService {
         if (blacklist.getIfPresent(ip) != null) {
             return;
         }
+        if(isGracePeriod(ip, reason)) return;
         blacklist.put(ip, new BlackListProfile(ip, reason.getReason(), name));
         queueService.removeQueue(ip);
         firewallService.firewall(ip);
@@ -117,6 +120,7 @@ public class BlackListService implements IService {
         if (blacklist.getIfPresent(ip) != null) {
             return;
         }
+        if(isGracePeriod(ip, reason)) return;
         blacklist.put(ip, new BlackListProfile(ip, reason.getReason()));
         queueService.removeQueue(ip);
         firewallService.firewall(ip);
@@ -131,10 +135,17 @@ public class BlackListService implements IService {
         if (blacklist.getIfPresent(ip) != null) {
             return getProfile(ip);
         }
+        if(isGracePeriod(ip, reason)) return getProfile(ip);
         blacklist.put(ip, new BlackListProfile(ip, reason.getReason(), name));
         queueService.removeQueue(ip);
         firewallService.firewall(ip);
         return getProfile(ip);
+    }
+
+    private boolean isGracePeriod(String ip, BlackListReason reason) {
+        if(!reason.name().startsWith("STRANGE_PLAYER")) return false;
+        long secs = plugin.getUserDataService().getProfile(ip).getSecondsFromFirstJoin();
+        return secs < 15;
     }
 
     @UnderAttackMethod
