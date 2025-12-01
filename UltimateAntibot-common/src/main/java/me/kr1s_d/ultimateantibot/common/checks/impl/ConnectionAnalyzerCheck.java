@@ -49,27 +49,38 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
     }
 
     public void checkJoined() {
-        if(true) return; //for now
         List<ConnectionProfile> last = userDataService.getLastJoinedAndConnectedProfiles(15);
+        if (last.size() < 3) return;
         List<ConnectionProfile> suspected = new ArrayList<>();
 
         for (ConnectionProfile profile : last) {
             if (whitelistService.isWhitelisted(profile.getIP())) continue;
 
             LimitedList<NickNameEntry> nickHistory = profile.getLastNickNames();
+            if (nickHistory == null || nickHistory.size() == 0) continue;
 
             for (NickNameEntry currentNickname : nickHistory) {
+                String name1 = currentNickname.getName();
+                if (name1 == null || name1.length() < 3) continue; // Skip very short names
                 for (ConnectionProfile otherProfile : last) {
-                    if (profile == otherProfile) continue; // Salta se controlla la stessa connessione
+                    if (profile == otherProfile) continue;
+                    if (whitelistService.isWhitelisted(otherProfile.getIP())) continue;
 
                     LimitedList<NickNameEntry> otherNickHistory = otherProfile.getLastNickNames();
+                    if (otherNickHistory == null || otherNickHistory.size() == 0) continue;
 
                     for (NickNameEntry otherNickname : otherNickHistory) {
-                        // Confronta i nickname
-                        if (StringUtil.calculateSimilarity(currentNickname.getName(), otherNickname.getName()) > 80) {
-                            // Aggiunge le connessioni con nickname uguali alla lista
-                            suspected.add(profile);
-                            suspected.add(otherProfile);
+                        String name2 = otherNickname.getName();
+                        if (name2 == null || name2.length() < 3) continue;
+                        
+                        // Length pre-filter: if lengths differ by more than 30%, skip comparison
+                        int lenDiff = Math.abs(name1.length() - name2.length());
+                        if (lenDiff > name1.length() * 0.3) continue;
+                        
+                        // Calculate similarity with optimized algorithm
+                        if (StringUtil.calculateSimilarity(name1, name2) > 80) {
+                            if (!suspected.contains(profile)) suspected.add(profile);
+                            if (!suspected.contains(otherProfile)) suspected.add(otherProfile);
                         }
                     }
                 }
@@ -85,29 +96,63 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
 
     public void onChat(String ip, String nickname, String message) {
         ConnectionProfile profile = userDataService.getProfile(ip);
+        if (profile == null) return;
         profile.trackChat(message);
-        if(true) return; //for now
+        
+        // Optimized chat similarity detection
         List<ConnectionProfile> last = userDataService.getLastJoinedAndConnectedProfiles(15);
+        if (last.size() < 2) return; // Need at least 2 profiles
 
-        List<String> entries = last.stream()
-                .filter(p -> !p.getIP().equals(ip)) //ignore self messages
-                .map(ConnectionProfile::getChatMessages)
-                .collect(ArrayList::new, (a, b) -> b.forEach(msg -> a.add(msg.getIP())), (a, b) -> {});
-        if(entries.isEmpty() || entries.size() > 10) return; //skip division for 0 and useless check
+        List<String> entries = new ArrayList<>();
+        for (ConnectionProfile p : last) {
+            if (p.getIP().equals(ip)) continue;
+            if (whitelistService.isWhitelisted(p.getIP())) continue;
+            try {
+                Object chatMsgsObj = p.getChatMessages();
+                if (chatMsgsObj != null) {
+                    if (chatMsgsObj instanceof Iterable) {
+                        for (Object msgEntry : (Iterable<?>) chatMsgsObj) {
+                            try {
+                                String msgContent = msgEntry.getClass().getMethod("getMessage").invoke(msgEntry).toString();
+                                if (msgContent != null && !msgContent.isEmpty()) {
+                                    entries.add(msgContent);
+                                }
+                            } catch (Exception ignored) {
+                                String msgContent = msgEntry.toString();
+                                if (msgContent != null && !msgContent.isEmpty()) {
+                                    entries.add(msgContent);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        
+        if(entries.isEmpty() || entries.size() > 10) return;
 
+        int similarCount = 0;
         for (String entry : entries) {
-            if (StringUtil.spaces(message) < 2 && message.length() < 5) continue; //ignore small messages
+            // Early skip for small messages or entry
+            if (StringUtil.spaces(message) < 2 && message.length() < 5) continue;
+            if (StringUtil.spaces(entry) < 2 && entry.length() < 5) continue;
+            int lenDiff = Math.abs(message.length() - entry.length());
+            if (lenDiff > message.length() * 0.5) continue;
+            
             if (StringUtil.calculateSimilarity(message, entry) > 85) {
+                similarCount++;
                 chatSuspected.incrementInt(profile, 0);
             }
         }
-        double percent = (double) chatSuspected.getOrDefaultNoPut(profile, Integer.class, 0) / ((double) entries.size()) * 100D;
+        
+        double percent = entries.isEmpty() ? 0.0 : (double) chatSuspected.getOrDefaultNoPut(profile, Integer.class, 0) / ((double) entries.size()) * 100D;
 
         if (percent >= ConfigManger.connectionAnalyzeChatTrigger) {
             profile.process(ScoreTracker.ScoreID.ABNORMAL_CHAT_MESSAGE);
         }
 
-        plugin.getLogHelper().debug("[CONNECTION ANALYZER] Chat percent for " + nickname + " is " + percent);
+        plugin.getLogHelper().debug("[CONNECTION ANALYZER] Chat percent for " + nickname + " is " + percent + " (similar: " + similarCount + "/" + entries.size() + ")");
     }
 
     public void onPing(String ip) {
@@ -116,7 +161,6 @@ public class ConnectionAnalyzerCheck implements StaticCheck {
 
     @Override
     public void onDisconnect(String ip, String name) {
-        //processed in userdataservice
     }
 
     @Override

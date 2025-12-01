@@ -1,6 +1,17 @@
 package me.kr1s_d.ultimateantibot.common.utils;
 
+import java.util.concurrent.TimeUnit;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 public class StringUtil {
+    
+    private static final Cache<String, Double> similarityCache = Caffeine.newBuilder()
+        .maximumSize(1000)
+        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .build();
+    
     public static int similarChars(String word1, String word2) {
         int count = 0;
         int minLength = Math.min(word1.length(), word2.length());
@@ -15,6 +26,16 @@ public class StringUtil {
     }
 
     public static double calculateSimilarity(String str1, String str2) {
+        if (str1.equals(str2)) return 100.0;
+        int lenDiff = Math.abs(str1.length() - str2.length());
+        int maxLen = Math.max(str1.length(), str2.length());
+        if (maxLen > 0 && lenDiff > maxLen * 0.5) return 0.0;
+        
+        String cacheKey = str1.length() < str2.length() ? (str1 + "|" + str2) : (str2 + "|" + str1);
+        Double cached = similarityCache.getIfPresent(cacheKey);
+        if (cached != null) return cached;
+        
+        // Calculate similarity
         str1 = str1.toLowerCase();
         str2 = str2.toLowerCase();
 
@@ -30,13 +51,18 @@ public class StringUtil {
         int letterMatchCount = countLetterMatches(str1, str2);
         int totalLetters = Math.max(countLetters(str1), countLetters(str2));
 
-        double wordSimilarity = (double) wordMatchCount / totalWords;
-        double letterSimilarity = (double) letterMatchCount / totalLetters;
-        double characterSimilarity = (double) characterMatchCount / totalCharacters;
+        double wordSimilarity = totalWords > 0 ? (double) wordMatchCount / totalWords : 0.0;
+        double letterSimilarity = totalLetters > 0 ? (double) letterMatchCount / totalLetters : 0.0;
+        double characterSimilarity = totalCharacters > 0 ? (double) characterMatchCount / totalCharacters : 0.0;
 
         // Calcolo della similarità totale come media dei tre rapporti
         double totalSimilarity = (characterSimilarity + wordSimilarity + letterSimilarity) / 3.0;
-        return totalSimilarity * 100.0;
+        double result = totalSimilarity * 100.0;
+        
+        // Cache the result
+        similarityCache.put(cacheKey, result);
+        
+        return result;
     }
 
     private static int countCharacterMatches(String str1, String str2) {
@@ -56,7 +82,6 @@ public class StringUtil {
         final int len = str1.length();
         int i = 0;
         while (i < len) {
-            // skip whitespace
             while (i < len && Character.isWhitespace(str1.charAt(i))) i++;
             if (i >= len) break;
             int start = i;

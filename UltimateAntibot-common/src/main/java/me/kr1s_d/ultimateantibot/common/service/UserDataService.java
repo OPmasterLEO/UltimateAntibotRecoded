@@ -33,6 +33,8 @@ public class UserDataService implements IService {
         this.plugin = plugin;
         this.logHelper = plugin.getLogHelper();
         this.profiles = Caffeine.newBuilder()
+            .maximumSize(50_000)
+            .expireAfterAccess(30, TimeUnit.DAYS)
             .build();
         this.onlineProfiles = new CopyOnWriteArrayList<>();
     }
