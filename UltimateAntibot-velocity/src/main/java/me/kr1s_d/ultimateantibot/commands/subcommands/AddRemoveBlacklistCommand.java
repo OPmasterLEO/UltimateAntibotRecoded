@@ -1,6 +1,13 @@
 package me.kr1s_d.ultimateantibot.commands.subcommands;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.velocitypowered.api.command.CommandSource;
+
 import me.kr1s_d.ultimateantibot.commands.SubCommand;
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
@@ -10,9 +17,6 @@ import me.kr1s_d.ultimateantibot.common.objects.profile.mapping.IPMapping;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.StringUtil;
 import me.kr1s_d.ultimateantibot.utils.Utils;
-
-import java.util.*;
-import java.util.stream.Stream;
 
 public class AddRemoveBlacklistCommand implements SubCommand {
 
