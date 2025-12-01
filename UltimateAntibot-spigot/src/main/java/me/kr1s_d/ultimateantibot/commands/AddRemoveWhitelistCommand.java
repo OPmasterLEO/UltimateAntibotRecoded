@@ -12,7 +12,6 @@ import org.bukkit.command.CommandSender;
 import me.kr1s_d.commandframework.objects.SubCommand;
 import me.kr1s_d.ultimateantibot.common.IAntiBotManager;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
-import me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.StringUtil;
 import me.kr1s_d.ultimateantibot.utils.Utils;
@@ -42,14 +41,24 @@ public class AddRemoveWhitelistCommand implements SubCommand {
             resolutionMethod = "direct IP";
         } else {
             final String usernameLower = input.toLowerCase();
-            org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
-            if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
-                resolvedIP = onlinePlayer.getAddress().getAddress().getHostAddress();
-                resolutionMethod = "online player";
+            me.kr1s_d.ultimateantibot.common.objects.profile.BlackListProfile profileByID = 
+                iAntiBotManager.getBlackListService().getBlacklistProfileFromID(input);
+            if (profileByID != null) {
+                resolvedIP = profileByID.getIp().replace("/", "");
+                resolutionMethod = "blacklist ID: " + profileByID.getId();
             }
             
             if (resolvedIP == null) {
-                ConnectionProfile connectionProfile = plugin.getUserDataService().getConnectedProfiles().stream()
+                org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayerExact(input);
+                if (onlinePlayer != null && onlinePlayer.getAddress() != null) {
+                    resolvedIP = onlinePlayer.getAddress().getAddress().getHostAddress();
+                    resolutionMethod = "online player";
+                }
+            }
+            
+            if (resolvedIP == null) {
+                me.kr1s_d.ultimateantibot.common.objects.profile.ConnectionProfile connectionProfile = 
+                    plugin.getUserDataService().getConnectedProfiles().stream()
                         .filter(s -> s.getCurrentNickName().equalsIgnoreCase(usernameLower))
                         .findAny()
                         .orElse(null);
@@ -62,8 +71,8 @@ public class AddRemoveWhitelistCommand implements SubCommand {
 
         if (resolvedIP == null || !StringUtil.isValidIPv4(resolvedIP)) {
             sender.sendMessage(Utils.colora(MessageManager.prefix + "&cFailed to resolve '" + input + "' to a valid IP address."));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: online players, connection profiles."));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP address or ensure the player has connected before."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: blacklist ID, online players, connection profiles."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP, ID, or player name."));
             return;
         }
 
@@ -112,7 +121,7 @@ public class AddRemoveWhitelistCommand implements SubCommand {
     public Map<Integer, List<String>> getTabCompleter(CommandSender commandSender, Command command, String s, String[] strings) {
         Map<Integer, List<String>> map = new HashMap<>();
         map.put(1, Arrays.asList("add", "remove"));
-        map.put(2, Collections.singletonList("<IP address/Player Name>"));
+        map.put(2, Collections.singletonList("<IP/Player/ID>"));
         return map;
     }
 

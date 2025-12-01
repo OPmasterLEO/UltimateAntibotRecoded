@@ -44,11 +44,20 @@ public class AddRemoveBlacklistCommand implements SubCommand {
             resolutionMethod = "direct IP";
         } else {
             final String usernameLower = input.toLowerCase();
-            IPMapping ipMapping = iAntiBotManager.getBlackListService().getIPMapping();
-            String ipFromMapping = ipMapping.getIPFromName(input);
-            if (ipFromMapping != null) {
-                resolvedIP = ipFromMapping.replace("/", "");
-                resolutionMethod = "historical mapping";
+            me.kr1s_d.ultimateantibot.common.objects.profile.BlackListProfile profileByID = 
+                iAntiBotManager.getBlackListService().getBlacklistProfileFromID(input);
+            if (profileByID != null) {
+                resolvedIP = profileByID.getIp().replace("/", "");
+                resolutionMethod = "blacklist ID: " + profileByID.getId();
+            }
+            
+            if (resolvedIP == null) {
+                IPMapping ipMapping = iAntiBotManager.getBlackListService().getIPMapping();
+                String ipFromMapping = ipMapping.getIPFromName(input);
+                if (ipFromMapping != null) {
+                    resolvedIP = ipFromMapping.replace("/", "");
+                    resolutionMethod = "historical mapping";
+                }
             }
             
             if (resolvedIP == null && plugin instanceof me.kr1s_d.ultimateantibot.UltimateAntiBotSpigot) {
@@ -74,8 +83,8 @@ public class AddRemoveBlacklistCommand implements SubCommand {
 
         if (resolvedIP == null || !StringUtil.isValidIPv4(resolvedIP)) {
             sender.sendMessage(Utils.colora(MessageManager.prefix + "&cFailed to resolve '" + input + "' to a valid IP address."));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: IPMapping, online players, connection profiles."));
-            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP address or ensure the player has connected before."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Tried: blacklist ID, IPMapping, online players, connection profiles."));
+            sender.sendMessage(Utils.colora(MessageManager.prefix + "&7Use a valid IP, ID, or player name."));
             return;
         }
 
@@ -92,7 +101,6 @@ public class AddRemoveBlacklistCommand implements SubCommand {
         }
 
         final String finalIP = resolvedIP;
-
         if (args[1].equalsIgnoreCase("add")) {
             iAntiBotManager.getBlackListService().blacklist("/" + finalIP, BlackListReason.ADMIN, 
                 plugin.getUserDataService().getProfile("/" + finalIP).getCurrentNickName());

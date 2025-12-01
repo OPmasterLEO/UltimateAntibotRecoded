@@ -1,5 +1,14 @@
 package me.kr1s_d.ultimateantibot.commands;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+
 import me.kr1s_d.commandframework.objects.SubCommand;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.objects.profile.BlackListProfile;
@@ -9,14 +18,6 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class CheckIDCommand implements SubCommand {
 
@@ -47,17 +48,23 @@ public class CheckIDCommand implements SubCommand {
             ));
         }
 
-        TextComponent whitelistComponent = new TextComponent();
-        whitelistComponent.setText("§a§l[WHITELIST]§f");
-        whitelistComponent.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, (new ComponentBuilder("§a§n» Click to WHITELIST this IP!").create())));
-        whitelistComponent.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/uab whitelist add " + profile.getIp().replace("/", "")));
+        if (sender instanceof Player) {
+            TextComponent whitelistComponent = new TextComponent();
+            whitelistComponent.setText("§a§l[WHITELIST]§f");
+            whitelistComponent.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, (new ComponentBuilder("§a§n» Click to WHITELIST this IP!").create())));
+            whitelistComponent.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/uab whitelist add " + profile.getIp().replace("/", "")));
 
-        TextComponent blacklistComponent = new TextComponent();
-        blacklistComponent.setText("§c§l[BLACKLIST]§f");
-        blacklistComponent.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, (new ComponentBuilder("§c§n» Click to BLACKLIST this IP!").create())));
-        blacklistComponent.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/uab blacklist add " + profile.getIp().replace("/", "")));
+            TextComponent blacklistComponent = new TextComponent();
+            blacklistComponent.setText("§c§l[BLACKLIST]§f");
+            blacklistComponent.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, (new ComponentBuilder("§c§n» Click to BLACKLIST this IP!").create())));
+            blacklistComponent.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/uab blacklist add " + profile.getIp().replace("/", "")));
 
-        ((Player)sender).spigot().sendMessage(whitelistComponent, blacklistComponent);
+            ((Player)sender).spigot().sendMessage(whitelistComponent, blacklistComponent);
+        } else {
+            sender.sendMessage(Utils.colora("§7Commands:"));
+            sender.sendMessage(Utils.colora("  §a/uab whitelist add " + profile.getIp().replace("/", "")));
+            sender.sendMessage(Utils.colora("  §c/uab blacklist add " + profile.getIp().replace("/", "")));
+        }
     }
 
     @Override
@@ -79,6 +86,6 @@ public class CheckIDCommand implements SubCommand {
 
     @Override
     public boolean allowedConsole() {
-        return false;
+        return true;
     }
 }
