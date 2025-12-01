@@ -1,5 +1,14 @@
 package me.kr1s_d.ultimateantibot.commands;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+
 import me.kr1s_d.commandframework.objects.SubCommand;
 import me.kr1s_d.ultimateantibot.common.IAntiBotPlugin;
 import me.kr1s_d.ultimateantibot.common.objects.LimitedList;
@@ -12,14 +21,6 @@ import me.kr1s_d.ultimateantibot.common.utils.ConfigManger;
 import me.kr1s_d.ultimateantibot.common.utils.MessageManager;
 import me.kr1s_d.ultimateantibot.common.utils.TimeUtil;
 import me.kr1s_d.ultimateantibot.utils.Utils;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class ConnectionProfileCommand implements SubCommand {
     private IAntiBotPlugin plugin;
